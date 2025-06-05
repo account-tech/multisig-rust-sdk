@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Multisig {
     global: Role,
     roles: HashMap<String, Role>,
     members: Vec<Member>,
 }
 
+#[derive(Debug)]
 pub struct Member {
     // social data
     username: String,
