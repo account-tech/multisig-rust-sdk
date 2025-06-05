@@ -1,0 +1,1 @@
+pub const FEE_ID: &str = "0x6a5a6fb7fd711ddfbaa50d3123b562841b91965baf16514bddd4206989897590";
