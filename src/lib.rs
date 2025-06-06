@@ -1,4 +1,4 @@
-pub mod account;
+pub mod multisig;
 pub mod fees;
 pub mod constants;
 
