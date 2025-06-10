@@ -6,9 +6,12 @@ use serde_json::Value;
 use sui_sdk::SuiClient;
 use sui_sdk::rpc_types::{SuiObjectDataOptions, SuiParsedData};
 use sui_sdk::types::base_types::{ObjectID, SuiAddress};
+use crate::constants::FEE_ID;
 
 pub struct Multisig {
     sui: Arc<SuiClient>,
+    fee_amount: u64,
+    fee_recipient: String,
     id: ObjectID,
     metadata: HashMap<String, String>,
     deps: Vec<Dep>,
@@ -55,6 +58,8 @@ impl Multisig {
     pub fn new(sui: Arc<SuiClient>, id: ObjectID) -> Self {
         Self {
             sui,
+            fee_amount: 0,
+            fee_recipient: String::new(),
             id,
             metadata: HashMap::new(),
             deps: Vec::new(),
@@ -66,12 +71,14 @@ impl Multisig {
     }
 
     pub async fn fetch(&mut self) -> Result<()> {
+        // fetch Account<Multisig> object
         let resp = self
             .sui
             .read_api()
             .get_object_with_options(self.id, SuiObjectDataOptions::new().with_content())
             .await?;
 
+        // parse the Account<Multisig> object
         let obj = resp.data.ok_or(anyhow!("Object not found"))?;
         if let SuiParsedData::MoveObject(content) = obj.content.unwrap() {
             let json = content.fields.to_json_value();
@@ -98,11 +105,44 @@ impl Multisig {
             return Err(anyhow!("Not a MoveObject"));
         }
 
+        // fetch the Fees object 
+        let resp = self.sui
+            .read_api()
+            .get_object_with_options(
+                ObjectID::from_hex_literal(FEE_ID).unwrap(), 
+                SuiObjectDataOptions::new().with_content()
+            )
+            .await?;
+        
+        // parse the Fees object
+        let obj = resp.data.ok_or(anyhow!("Fees object not found"))?;
+        if let SuiParsedData::MoveObject(content) = obj.content.unwrap() {
+            let json = content.fields.to_json_value();
+
+            self.fee_amount = json.get("amount")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok())
+                .ok_or(anyhow!("Invalid amount"))?;
+
+            self.fee_recipient = json.get("recipient")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .ok_or(anyhow!("Invalid recipient"))?;
+        }
+
         Ok(())
     }
 
     // === Getters ===
 
+    pub fn fee_amount(&self) -> u64 {
+        self.fee_amount
+    }
+
+    pub fn fee_recipient(&self) -> &str {
+        &self.fee_recipient
+    }
+    
     pub fn id(&self) -> ObjectID {
         self.id
     }
@@ -207,7 +247,7 @@ impl Multisig {
             .ok_or(anyhow!("Invalid locked array"))?
             .iter()
             .map(|id| {
-                Ok(ObjectID::from_hex_literal(id.as_str().ok_or(anyhow!("Invalid locked id"))?)?)
+                Ok(ObjectID::from_hex_literal(id.as_str().ok_or_else(|| anyhow!("Invalid locked id: {:?}", id))?)?)
             })
             .collect::<Result<Vec<ObjectID>>>()?;
         
@@ -228,22 +268,22 @@ impl Multisig {
                         .get("addr")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string())
-                        .ok_or(anyhow!("Invalid address"))?,
+                        .ok_or(anyhow!("Invalid member address"))?,
                     weight: member
                         .get("weight")
                         .and_then(|v| v.as_str())
                         .and_then(|s| s.parse::<u64>().ok())
-                        .ok_or(anyhow!("Invalid weight"))?,
+                        .ok_or(anyhow!("Invalid member weight"))?,
                     roles: member
                         .get("roles")
                         .and_then(|v| v.get("contents"))
                         .and_then(|v| v.as_array())
-                        .ok_or(anyhow!("Invalid roles"))?
+                        .ok_or(anyhow!("Invalid member roles"))?
                         .iter()
                         .map(|v| {
                             v.as_str()
                                 .map(|s| s.to_string())
-                                .ok_or(anyhow!("Invalid name"))
+                                .ok_or(anyhow!("Invalid member role name"))
                         })
                         .collect::<Result<Vec<String>>>()?,
                 })
@@ -267,13 +307,13 @@ impl Multisig {
                         .get("name")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string())
-                        .ok_or(anyhow!("Invalid name"))?,
+                        .ok_or(anyhow!("Invalid role name"))?,
                     Role {
                         threshold: role
                             .get("threshold")
                             .and_then(|v| v.as_str())
                             .and_then(|s| s.parse::<u64>().ok())
-                            .ok_or(anyhow!("Invalid threshold"))?,
+                            .ok_or(anyhow!("Invalid role threshold"))?,
                         total_weight: 0,
                     }
                 ))

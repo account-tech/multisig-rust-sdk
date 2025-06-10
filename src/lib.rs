@@ -1,5 +1,5 @@
 pub mod multisig;
-pub mod fees;
+pub mod intents;
 pub mod constants;
 
 use sui_sdk::SuiClient;

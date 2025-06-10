@@ -18,8 +18,10 @@ async fn main() -> Result<()> {
     // println!("Multisig: {:#?}", multisig.unverified_deps_allowed());
     // println!("Multisig: {:#?}", multisig.intents_bag_id());
     // println!("Multisig: {:#?}", multisig.locked_objects());
-    println!("Multisig: {:#?}", multisig.config().members);
-    println!("Multisig: {:#?}", multisig.config().global);
+    println!("Members: {:#?}", multisig.config().members);
+    println!("Global: {:#?}", multisig.config().global);
+    println!("Fee Amount: {:#?}", multisig.fee_amount());
+    println!("Fee Recipient: {:#?}", multisig.fee_recipient());
 
     Ok(())
 }
