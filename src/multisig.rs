@@ -256,7 +256,7 @@ impl Multisig {
             .and_then(|s| s.parse::<u64>().ok())
             .ok_or(anyhow!("Invalid global field"))?;
 
-        let roles_field = config_struct
+        let mut roles_field = config_struct
             .get("roles")
             .and_then(|v| v.as_array())
             .ok_or(anyhow!("Invalid roles field"))?
@@ -280,9 +280,21 @@ impl Multisig {
             })
             .collect::<Result<HashMap<String, Role>>>()?;
 
+        // calculate the total weight of the global and role thresholds
+        let total_weight = members_field.iter().fold(0, |acc, member| acc + member.weight);
+
+        for member in &members_field {
+            for role in &member.roles {
+                roles_field
+                    .get_mut(role)
+                    .ok_or_else(|| anyhow!("Role {} not found", role))?
+                    .total_weight += member.weight;
+            }
+        }
+
         Ok(Config {
             members: members_field,
-            global: Role { threshold: global_field, total_weight: 0 },
+            global: Role { threshold: global_field, total_weight },
             roles: roles_field,
         })
     }

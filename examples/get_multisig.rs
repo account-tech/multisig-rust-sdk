@@ -12,13 +12,14 @@ async fn main() -> Result<()> {
     let mut multisig = Multisig::new(Arc::new(client), ObjectID::from_hex_literal("0x6de46a045f17ccb4ca0cd4c1051af3cb70ee54b385a86d5347b2eeb18c742bfb").unwrap());
     multisig.fetch().await?;
 
-    println!("Multisig: {:#?}", multisig.id());
-    println!("Multisig: {:#?}", multisig.metadata());
-    println!("Multisig: {:#?}", multisig.deps());
-    println!("Multisig: {:#?}", multisig.unverified_deps_allowed());
-    println!("Multisig: {:#?}", multisig.intents_bag_id());
-    println!("Multisig: {:#?}", multisig.locked_objects());
-    println!("Multisig: {:#?}", multisig.config());
+    // println!("Multisig: {:#?}", multisig.id());
+    // println!("Multisig: {:#?}", multisig.metadata());
+    // println!("Multisig: {:#?}", multisig.deps());
+    // println!("Multisig: {:#?}", multisig.unverified_deps_allowed());
+    // println!("Multisig: {:#?}", multisig.intents_bag_id());
+    // println!("Multisig: {:#?}", multisig.locked_objects());
+    println!("Multisig: {:#?}", multisig.config().members);
+    println!("Multisig: {:#?}", multisig.config().global);
 
     Ok(())
 }
