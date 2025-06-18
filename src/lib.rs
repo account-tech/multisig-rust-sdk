@@ -2,6 +2,7 @@ pub mod multisig;
 pub mod intents;
 pub mod constants;
 pub mod move_binding;
+pub mod intent_type;
 
 use anyhow::{Ok, Result};
 use sui_graphql_client::Client;
