@@ -15,30 +15,37 @@ pub struct Multisig {
     fee_recipient: Address,
     id: Address,
     metadata: HashMap<String, String>,
-    deps: Vec<ap::deps::Dep>,
+    deps: Vec<Dep>,
     unverified_deps_allowed: bool,
     intents_bag_id: Address,
     locked_objects: Vec<Address>,
     config: Config,
 }
 
+#[derive(Debug)]
+pub struct Dep {
+    pub name: String,
+    pub addr: Address,
+    pub version: u64,
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
-    pub members: Vec<am::multisig::Member>,
+    pub members: Vec<Member>,
     pub global: Role,
     pub roles: HashMap<String, Role>,
 }
 
-// #[derive(Debug, Default)]
-// pub struct Member {
-//     // social data
-//     pub username: String,
-//     pub avatar: String,
-//     // member data
-//     pub address: String,
-//     pub weight: u64,
-//     pub roles: Vec<String>,
-// }
+#[derive(Debug, Default)]
+pub struct Member {
+    // social data
+    pub username: String,
+    pub avatar: String,
+    // member data
+    pub address: String,
+    pub weight: u64,
+    pub roles: Vec<String>,
+}
 
 #[derive(Debug, Default)]
 pub struct Role {
@@ -85,7 +92,14 @@ impl Multisig {
                 .collect::<HashMap<String, String>>();
 
             // get the deps array and unverified toggle
-            self.deps = multisig.deps.inner;
+            self.deps = multisig.deps.inner
+                .iter()
+                .map(|dep| Dep {
+                    name: dep.name.to_string(),
+                    addr: dep.addr,
+                    version: dep.version,
+                })
+                .collect();
             self.unverified_deps_allowed = multisig.deps.unverified_allowed;
 
             // get the intents bag id and locked objects array
@@ -94,7 +108,13 @@ impl Multisig {
 
             // get the fields from the config/multisig struct
             self.config = Config {
-                members: multisig.config.members,
+                members: multisig.config.members.iter().map(|member| Member {
+                    username: String::new(),
+                    avatar: String::new(),
+                    address: member.addr.to_string(),
+                    weight: member.weight,
+                    roles: member.roles.contents.iter().map(|role| role.to_string()).collect(),
+                }).collect(),
                 global: Role {
                     threshold: multisig.config.global,
                     total_weight: 0,
@@ -113,7 +133,7 @@ impl Multisig {
                 .fold(0, |acc, member| acc + member.weight);
 
             for member in &self.config.members {
-                for role in member.roles.contents.iter() {
+                for role in member.roles.iter() {
                     self.config.roles
                         .get_mut(role)
                         .ok_or_else(|| anyhow!("Role {} not found", role))?
@@ -164,7 +184,7 @@ impl Multisig {
         &self.metadata
     }
 
-    pub fn deps(&self) -> &Vec<ap::deps::Dep> {
+    pub fn deps(&self) -> &Vec<Dep> {
         &self.deps
     }
 
