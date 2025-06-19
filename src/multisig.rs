@@ -159,22 +159,22 @@ impl Multisig {
         // --- Fees ---
 
         // fetch the Fees object
-        let resp = self
+        let contents = self
             .sui_client
-            .object(Address::from_hex(FEE_OBJECT).unwrap(), None)
+            .move_object_contents_bcs(Address::from_hex(FEE_OBJECT).unwrap(), None)
             .await
-            .map_err(|e| anyhow!("Failed to fetch fees object: {}", e))?
-            .ok_or_else(|| anyhow!("Fees object not found"))?;
+            .map_err(|e| anyhow!("Failed to fetch fees object: {}", e))?;
 
         // parse the Fees object
-        if let ObjectData::Struct(obj) = resp.data() {
-            let fees: am::fees::Fees = bcs::from_bytes(obj.contents())
-                .map_err(|e| anyhow!("Failed to parse fees object: {}", e))?;   
-
-            self.fee_amount = fees.amount;
-            self.fee_recipient = fees.recipient;
-        } else {
-            return Err(anyhow!("Fees not a MoveObject"));
+        match contents {
+            Some(contents) => {
+                let fees: am::fees::Fees = bcs::from_bytes(&contents)
+                    .map_err(|e| anyhow!("Failed to parse fees object: {}", e))?;   
+        
+                self.fee_amount = fees.amount;
+                self.fee_recipient = fees.recipient;
+            }
+            None => return Err(anyhow!("Fees not a MoveObject"))
         }
 
         Ok(())
