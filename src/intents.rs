@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::fmt;
 use anyhow::{anyhow, Ok, Result};
 use sui_graphql_client::{Client, PaginationFilter, Direction};
-use sui_sdk_types::Address;
+use sui_sdk_types::{Address, TypeTag};
 
 use crate::intent_type::{IntentType, deserialize_action_args};
 use crate::move_binding::account_protocol as ap;
@@ -121,12 +121,12 @@ impl fmt::Debug for Intents {
 
 impl Intent {
     pub async fn get_actions_args(&self) -> Result<IntentType> {
-        let actions_bcs = self.fetch_actions_bcs().await?;
+        let actions_bcs = self.fetch_actions_generics_and_bcs_contents().await?;
         deserialize_action_args(&self.type_, &actions_bcs)
     }
     
-    async fn fetch_actions_bcs(&self) -> Result<Vec<Vec<u8>>> {
-        let mut dfs = Vec::<Vec<u8>>::new();
+    async fn fetch_actions_generics_and_bcs_contents(&self) -> Result<Vec<(Vec<TypeTag>, Vec<u8>)>> {
+        let mut dfs = Vec::<(Vec<TypeTag>, Vec<u8>)>::new();
         let mut cursor = None;
         let mut has_next_page = true;
 
@@ -140,7 +140,11 @@ impl Intent {
             let resp = self.sui_client.dynamic_fields(self.actions_bag_id, filter).await?;
             for df_output in resp.data() {
                 if let Some(value) = &df_output.value {
-                    dfs.push(value.1.clone());
+                    let type_params = match &value.0 {
+                        TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
+                        _ => vec![],
+                    };
+                    dfs.push((type_params, value.1.clone())); // generics + contents bcs 
                 }
             }
 
