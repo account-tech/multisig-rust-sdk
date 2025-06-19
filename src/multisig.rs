@@ -7,7 +7,8 @@ use sui_sdk_types::{ObjectData, Address};
 
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_multisig as am;
-use crate::constants::FEE_ID;
+use crate::constants::FEE_OBJECT;
+use crate::intents::Intents;
 
 pub struct Multisig {
     sui_client: Arc<Client>,
@@ -20,6 +21,7 @@ pub struct Multisig {
     intents_bag_id: Address,
     locked_objects: Vec<Address>,
     config: Config,
+    intents: Option<Intents>, // if None then not fetched yet
 }
 
 #[derive(Debug)]
@@ -58,7 +60,7 @@ pub struct Role {
 impl Multisig {
     pub fn new(sui_client: Arc<Client>, id: Address) -> Self {
         Self {
-            sui_client,
+            sui_client: sui_client.clone(),
             fee_amount: 0,
             fee_recipient: Address::from_hex("0x0").unwrap(),
             id,
@@ -68,10 +70,14 @@ impl Multisig {
             intents_bag_id: Address::from_hex("0x0").unwrap(),
             locked_objects: Vec::new(),
             config: Config::default(),
+            intents: None,
         }
     }
 
     pub async fn fetch(&mut self) -> Result<()> {
+
+        // --- Account<Multisig> ---
+
         // fetch Account<Multisig> object
         let resp = self
             .sui_client
@@ -144,10 +150,18 @@ impl Multisig {
             return Err(anyhow!("Multisig not a MoveObject"));
         }
 
+        // --- Intents ---
+
+        let mut intents = Intents::new(self.sui_client.clone(), self.intents_bag_id);
+        intents.fetch().await?;
+        self.intents = Some(intents);
+
+        // --- Fees ---
+
         // fetch the Fees object
         let resp = self
             .sui_client
-            .object(Address::from_hex(FEE_ID).unwrap(), None)
+            .object(Address::from_hex(FEE_OBJECT).unwrap(), None)
             .await
             .map_err(|e| anyhow!("Failed to fetch fees object: {}", e))?
             .ok_or_else(|| anyhow!("Fees object not found"))?;
@@ -202,5 +216,9 @@ impl Multisig {
 
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    pub fn intents(&self) -> &Option<Intents> {
+        &self.intents
     }
 }

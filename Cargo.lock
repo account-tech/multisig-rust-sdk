@@ -1700,7 +1700,7 @@ dependencies = [
 [[package]]
 name = "move-binding"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/move-binding?rev=28b055a#28b055ab632fd9bd102108a15b040eb6d309efcf"
+source = "git+https://github.com/MystenLabs/move-binding?rev=4570303#4570303e169d41149799592263e824179014ea24"
 dependencies = [
  "anyhow",
  "bcs",
@@ -1708,37 +1708,27 @@ dependencies = [
  "itertools 0.14.0",
  "move-binary-format",
  "move-core-types",
- "move-types",
  "once_cell",
  "prettyplease",
  "proc-macro2",
  "quote",
  "reqwest",
- "serde",
  "serde_json",
  "sui-sdk-types",
- "sui-transaction-builder",
  "syn 2.0.103",
 ]
 
 [[package]]
 name = "move-binding-derive"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/move-binding?rev=28b055a#28b055ab632fd9bd102108a15b040eb6d309efcf"
+source = "git+https://github.com/MystenLabs/move-binding?rev=4570303#4570303e169d41149799592263e824179014ea24"
 dependencies = [
- "anyhow",
  "bcs",
- "fastcrypto",
- "itertools 0.14.0",
- "move-binary-format",
  "move-binding",
- "move-core-types",
  "move-types",
  "proc-macro2",
  "quote",
- "reqwest",
  "serde",
- "serde_json",
  "sui-sdk-types",
  "sui-transaction-builder",
  "syn 2.0.103",
@@ -1781,7 +1771,7 @@ dependencies = [
 [[package]]
 name = "move-types"
 version = "0.1.0"
-source = "git+https://github.com/MystenLabs/move-binding?rev=28b055a#28b055ab632fd9bd102108a15b040eb6d309efcf"
+source = "git+https://github.com/MystenLabs/move-binding?rev=4570303#4570303e169d41149799592263e824179014ea24"
 dependencies = [
  "move-core-types",
  "serde",
@@ -1798,6 +1788,7 @@ dependencies = [
  "move-binding-derive",
  "move-types",
  "serde",
+ "serde_json",
  "sui-graphql-client",
  "sui-sdk-types",
  "sui-transaction-builder",

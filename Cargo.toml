@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-move-binding-derive = { git = "https://github.com/MystenLabs/move-binding", rev="28b055a" }
-move-types = { git = "https://github.com/MystenLabs/move-binding", rev="28b055a" }
+move-binding-derive = { git = "https://github.com/MystenLabs/move-binding", rev="4570303" }
+move-types = { git = "https://github.com/MystenLabs/move-binding", rev="4570303" }
 
 sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="86a9e06" }
 sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", features = ["serde"], package = "sui-sdk-types", rev="86a9e06" }
@@ -15,3 +15,4 @@ tokio = { version = "1.45", features = ["full"] }
 anyhow = "1.0"
 serde = "1.0"
 bcs = "0.1.6"
+serde_json = "1.0.140"
