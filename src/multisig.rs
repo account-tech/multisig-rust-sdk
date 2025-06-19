@@ -1,6 +1,7 @@
 use anyhow::{Ok, Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::fmt;
 
 use sui_graphql_client::Client;
 use sui_sdk_types::{ObjectData, Address};
@@ -220,5 +221,22 @@ impl Multisig {
 
     pub fn intents(&self) -> &Option<Intents> {
         &self.intents
+    }
+}
+
+impl fmt::Debug for Multisig {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Multisig")
+            .field("fee_amount", &self.fee_amount)
+            .field("fee_recipient", &self.fee_recipient)
+            .field("id", &self.id)
+            .field("metadata", &self.metadata)
+            .field("deps", &self.deps)
+            .field("unverified_deps_allowed", &self.unverified_deps_allowed)
+            .field("intents_bag_id", &self.intents_bag_id)
+            .field("locked_objects", &self.locked_objects)
+            .field("config", &self.config)
+            .field("intents", &self.intents)
+            .finish()
     }
 }
