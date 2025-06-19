@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::fmt;
 use anyhow::{anyhow, Ok, Result};
-use serde::{Serialize};
 use sui_graphql_client::{Client, PaginationFilter, Direction};
 use sui_sdk_types::Address;
 
+use crate::intent_type::{IntentType, deserialize_action_args};
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_multisig as am;
 
@@ -15,9 +15,7 @@ pub struct Intents {
     pub intents: HashMap<String, Intent>,
 }
 
-#[derive(Serialize)]
 pub struct Intent {
-    #[serde(skip)]
     pub sui_client: Arc<Client>,
     pub type_: String,
     pub key: String,
@@ -33,7 +31,7 @@ pub struct Intent {
     pub outcome: Approvals,
 }
 
-#[derive(Serialize)]
+#[derive(Debug)]
 pub struct Approvals {
     pub total_weight: u64,
     pub role_weight: u64,
@@ -95,10 +93,39 @@ impl Intents {
 
         Ok(())
     }
+
+    pub fn get_intent(&self, key: &str) -> Option<&Intent> {
+        self.intents.get(key)
+    }
+}
+
+impl fmt::Display for Intents {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for intent in self.intents.values() {
+            writeln!(f, "{}", intent)?;
+        }
+
+        fmt::Result::Ok(())
+    }
+}
+
+impl fmt::Debug for Intents {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Intents")
+            .field("bag_id", &self.bag_id)
+            .field("intents_count", &self.intents.len())
+            .field("intents", &self.intents)
+            .finish()
+    }
 }
 
 impl Intent {
-    pub async fn fetch_actions_bcs(&mut self) -> Result<()> {
+    pub async fn get_actions_args(&self) -> Result<IntentType> {
+        let actions_bcs = self.fetch_actions_bcs().await?;
+        deserialize_action_args(&self.type_, &actions_bcs)
+    }
+    
+    async fn fetch_actions_bcs(&self) -> Result<Vec<Vec<u8>>> {
         let mut dfs = Vec::<Vec<u8>>::new();
         let mut cursor = None;
         let mut has_next_page = true;
@@ -121,25 +148,32 @@ impl Intent {
             has_next_page = resp.page_info().has_next_page;
         }
 
-        Ok(())
+        Ok(dfs)
     }
 
-}
-
-impl fmt::Display for Intents {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (key, intent) in &self.intents {
-            writeln!(f, "{}: {}", key, intent)?;
-        }
-        fmt::Result::Ok(())
-    }
 }
 
 impl fmt::Display for Intent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match serde_json::to_string_pretty(self) {
-            std::result::Result::Ok(json) => write!(f, "{}", json),
-            std::result::Result::Err(e) => write!(f, "<failed to serialize intent: {}>", e),
-        }
+        write!(f, "Intent: {}", self.key)
+    }
+}
+
+impl fmt::Debug for Intent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Intent")
+            .field("key", &self.key)
+            .field("type", &self.type_)
+            .field("description", &self.description)
+            .field("account", &self.account)
+            .field("creator", &self.creator)
+            .field("creation_time", &self.creation_time)
+            .field("execution_times", &self.execution_times)
+            .field("expiration_time", &self.expiration_time)
+            .field("role", &self.role)
+            .field("actions_bag_id", &self.actions_bag_id)
+            .field("actions_bcs", &self.actions_bcs)
+            .field("outcome", &self.outcome)
+            .finish()
     }
 }
