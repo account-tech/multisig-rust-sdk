@@ -1,17 +1,26 @@
 [package]
-name = "multisig-sdk"
+name = "account-multisig-sdk"
 version = "0.1.0"
+authors = ["Thouny <thouny@tuta.io>"]
+repository = "https://github.com/account-tech/multisig-rust-sdk/"
+license = "Apache-2.0"
 edition = "2021"
+readme = "README.md"
+description = "Account Multisig SDK"
 
 [dependencies]
-move-binding-derive = { git = "https://github.com/MystenLabs/move-binding", rev="4570303" }
-move-types = { git = "https://github.com/MystenLabs/move-binding", rev="4570303" }
+move-binding-derive = { git = "https://github.com/thounyy/move-binding" }
+move-types = { git = "https://github.com/thounyy/move-binding" }
 
-sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="86a9e06" }
-sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", features = ["serde"], package = "sui-sdk-types", rev="86a9e06" }
-sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="86a9e06" }
+sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="f0c8068" }
+sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="f0c8068", features = ["serde"] }
+sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="f0c8068" }
 
 tokio = { version = "1.45", features = ["full"] }
 anyhow = "1.0"
 serde = "1.0"
 bcs = "0.1.6"
+
+[dev-dependencies]
+sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="f0c8068", features = ["ed25519"] }
+base64ct = { version = "1.6", features = ["std"] }

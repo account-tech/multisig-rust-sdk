@@ -3,7 +3,7 @@ use anyhow::Result;
 use sui_graphql_client::Client;
 use sui_sdk_types::Address;
 
-use multisig_sdk::multisig::Multisig;
+use account_multisig_sdk::multisig::Multisig;
 
 #[tokio::main]
 async fn main() -> Result<()> {

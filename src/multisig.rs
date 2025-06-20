@@ -8,7 +8,6 @@ use sui_sdk_types::{ObjectData, Address};
 
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_multisig as am;
-use crate::constants::FEE_OBJECT;
 use crate::intents::Intents;
 
 pub struct Multisig {
@@ -59,6 +58,8 @@ pub struct Role {
 }
 
 impl Multisig {
+    pub const FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
+
     pub fn new(sui_client: Arc<Client>, id: Address) -> Self {
         Self {
             sui_client: sui_client.clone(),
@@ -162,7 +163,7 @@ impl Multisig {
         // fetch the Fees object
         let contents = self
             .sui_client
-            .move_object_contents_bcs(Address::from_hex(FEE_OBJECT).unwrap(), None)
+            .move_object_contents_bcs(Address::from_hex(Self::FEE_OBJECT).unwrap(), None)
             .await
             .map_err(|e| anyhow!("Failed to fetch fees object: {}", e))?;
 
