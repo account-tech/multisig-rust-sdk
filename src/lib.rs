@@ -3,6 +3,7 @@ pub mod intents;
 pub mod move_binding;
 pub mod intent_type;
 
+use std::sync::Arc;
 use anyhow::{anyhow, Ok, Result};
 use sui_graphql_client::Client;
 use sui_transaction_builder::Serialized;
@@ -16,7 +17,7 @@ use crate::move_binding::account_multisig as am;
 use crate::multisig::Multisig;
 
 pub struct MultisigClient {
-    sui_client: Client,
+    sui_client: Arc<Client>,
     multisig: Option<Multisig>,
 }
 
@@ -27,20 +28,22 @@ impl MultisigClient {
     // === Constructors ===
 
     pub fn new_with_client(sui_client: Client) -> Self {
-        Self { sui_client, multisig: None }
+        Self { sui_client: Arc::new(sui_client), multisig: None }
     }
 
     pub fn new_with_url(url: &str) -> Result<Self> {
-        Ok(Self { sui_client: Client::new(url)?, multisig: None })
+        Ok(Self { sui_client: Arc::new(Client::new(url)?), multisig: None })
     }
 
     pub fn new_testnet() -> Self {
-        Self { sui_client: Client::new_testnet(), multisig: None }
+        Self { sui_client: Arc::new(Client::new_testnet()), multisig: None }
     }
 
     pub fn new_mainnet() -> Self {
-        Self { sui_client: Client::new_mainnet(), multisig: None }
+        Self { sui_client: Arc::new(Client::new_mainnet()), multisig: None }
     }
+
+    // === Multisig ===
 
     pub async fn create_multisig(&self, builder: &mut TransactionBuilder) -> Result<()> {
         let extensions_obj = &self.sui_client
@@ -70,6 +73,11 @@ impl MultisigClient {
 
         sui::transfer::public_share_object(builder, account_obj);
 
+        Ok(())
+    }
+
+    pub async fn load_multisig(&mut self, id: Address) -> Result<()> {
+        self.multisig = Some(Multisig::from_id(self.sui_client.clone(), id).await?);
         Ok(())
     }
 
