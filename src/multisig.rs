@@ -60,8 +60,8 @@ pub struct Role {
 impl Multisig {
     pub const FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
 
-    pub fn new(sui_client: Arc<Client>, id: Address) -> Self {
-        Self {
+    pub async fn from_id(sui_client: Arc<Client>, id: Address) -> Result<Self> {
+        let mut multisig = Self {
             sui_client: sui_client.clone(),
             fee_amount: 0,
             fee_recipient: Address::ZERO,
@@ -73,10 +73,13 @@ impl Multisig {
             locked_objects: Vec::new(),
             config: Config::default(),
             intents: None,
-        }
+        };
+
+        multisig.refresh().await?;
+        Ok(multisig)
     }
 
-    pub async fn fetch(&mut self) -> Result<()> {
+    pub async fn refresh(&mut self) -> Result<()> {
 
         // --- Account<Multisig> ---
 
