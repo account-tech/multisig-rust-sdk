@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::fmt;
 use anyhow::{anyhow, Ok, Result};
-use sui_graphql_client::{Client, PaginationFilter, Direction};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
+use sui_graphql_client::{Client, Direction, PaginationFilter};
 use sui_sdk_types::{Address, TypeTag};
 
-use crate::intent_type::{IntentType, deserialize_action_args};
-use crate::move_binding::account_protocol as ap;
+use crate::actions::{deserialize_actions, IntentActionsType};
 use crate::move_binding::account_multisig as am;
+use crate::move_binding::account_protocol as ap;
 
 pub struct Intents {
     pub sui_client: Arc<Client>,
@@ -46,7 +46,7 @@ impl Intents {
             intents: HashMap::new(),
         }
     }
-    
+
     pub async fn fetch(&mut self) -> Result<()> {
         let mut cursor = None;
         let mut has_next_page = true;
@@ -62,28 +62,32 @@ impl Intents {
             for df_output in resp.data() {
                 match &df_output.value {
                     Some(value) => {
-                        let intent: ap::intents::Intent<am::multisig::Approvals> = bcs::from_bytes(&value.1)?;
-                        self.intents.insert(intent.key.clone(), Intent { 
-                            sui_client: self.sui_client.clone(), 
-                            type_: intent.type_, 
-                            key: intent.key, 
-                            description: intent.description, 
-                            account: intent.account, 
-                            creator: intent.creator, 
-                            creation_time: intent.creation_time, 
-                            execution_times: intent.execution_times, 
-                            expiration_time: intent.expiration_time, 
-                            role: intent.role, 
-                            actions_bag_id: intent.actions.id.into(), 
-                            actions_bcs: Vec::new(), 
-                            outcome: Approvals { 
-                                total_weight: intent.outcome.total_weight, 
-                                role_weight: intent.outcome.role_weight, 
-                                approved: intent.outcome.approved.contents 
-                            } 
-                        });
-                    },
-                    None => Err(anyhow!("Intent not found"))?
+                        let intent: ap::intents::Intent<am::multisig::Approvals> =
+                            bcs::from_bytes(&value.1)?;
+                        self.intents.insert(
+                            intent.key.clone(),
+                            Intent {
+                                sui_client: self.sui_client.clone(),
+                                type_: intent.type_,
+                                key: intent.key,
+                                description: intent.description,
+                                account: intent.account,
+                                creator: intent.creator,
+                                creation_time: intent.creation_time,
+                                execution_times: intent.execution_times,
+                                expiration_time: intent.expiration_time,
+                                role: intent.role,
+                                actions_bag_id: intent.actions.id.into(),
+                                actions_bcs: Vec::new(),
+                                outcome: Approvals {
+                                    total_weight: intent.outcome.total_weight,
+                                    role_weight: intent.outcome.role_weight,
+                                    approved: intent.outcome.approved.contents,
+                                },
+                            },
+                        );
+                    }
+                    None => Err(anyhow!("Intent not found"))?,
                 }
             }
 
@@ -120,12 +124,14 @@ impl fmt::Debug for Intents {
 }
 
 impl Intent {
-    pub async fn get_actions_args(&self) -> Result<IntentType> {
+    pub async fn get_actions_args(&self) -> Result<IntentActionsType> {
         let actions_bcs = self.fetch_actions_generics_and_bcs_contents().await?;
-        deserialize_action_args(&self.type_, &actions_bcs)
+        deserialize_actions(&self.type_, &actions_bcs)
     }
-    
-    async fn fetch_actions_generics_and_bcs_contents(&self) -> Result<Vec<(Vec<TypeTag>, Vec<u8>)>> {
+
+    async fn fetch_actions_generics_and_bcs_contents(
+        &self,
+    ) -> Result<Vec<(Vec<TypeTag>, Vec<u8>)>> {
         let mut dfs = Vec::<(Vec<TypeTag>, Vec<u8>)>::new();
         let mut cursor = None;
         let mut has_next_page = true;
@@ -137,14 +143,17 @@ impl Intent {
                 limit: Some(50),
             };
 
-            let resp = self.sui_client.dynamic_fields(self.actions_bag_id, filter).await?;
+            let resp = self
+                .sui_client
+                .dynamic_fields(self.actions_bag_id, filter)
+                .await?;
             for df_output in resp.data() {
                 if let Some(value) = &df_output.value {
                     let type_params = match &value.0 {
                         TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
                         _ => vec![],
                     };
-                    dfs.push((type_params, value.1.clone())); // generics + contents bcs 
+                    dfs.push((type_params, value.1.clone())); // generics + contents bcs
                 }
             }
 
@@ -154,7 +163,6 @@ impl Intent {
 
         Ok(dfs)
     }
-
 }
 
 impl fmt::Display for Intent {
