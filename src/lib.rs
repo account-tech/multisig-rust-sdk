@@ -1,7 +1,7 @@
 pub mod multisig;
 pub mod intents;
 pub mod move_binding;
-pub mod intent_type;
+pub mod actions;
 
 use std::sync::Arc;
 use anyhow::{anyhow, Ok, Result};
@@ -64,7 +64,7 @@ impl MultisigClient {
         let fee_arg = builder.input(Input::from(fee_obj).by_ref());
         let extensions_arg = builder.input(Input::from(extensions_obj).by_ref());
 
-        let account_obj = am::multisig::new_account(
+        let account_obj: move_types::functions::Arg<move_binding::account_protocol::account::Account<am::multisig::Multisig>> = am::multisig::new_account(
             builder, 
             extensions_arg.into(), 
             fee_arg.into(), 

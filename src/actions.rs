@@ -1,13 +1,16 @@
 use anyhow::Ok;
 use anyhow::{anyhow, Result};
+use move_types::functions::{Arg, MutRef};
 use sui_sdk_types::{Address, TypeTag};
+use sui_transaction_builder::unresolved::Input;
+use sui_transaction_builder::TransactionBuilder;
 
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_actions as aa;
 use crate::move_binding::account_multisig as am;
 
 #[derive(Debug, Clone)]
-pub enum IntentType {
+pub enum IntentActionsType {
     ConfigMultisig(ConfigMultisigArgs),
     ConfigDeps(ConfigDepsArgs),
     ToggleUnverifiedAllowed(ToggleUnverifiedAllowedArgs),
@@ -181,11 +184,11 @@ impl TryFrom<u8> for Policy {
     }
 }
 
-pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec<u8>)]) -> Result<IntentType> {
+pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec<u8>)]) -> Result<IntentActionsType> {
     match move_intent_type {
         "460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config::ConfigMultisigIntent" => {
             let action: am::config::ConfigMultisigAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::ConfigMultisig(ConfigMultisigArgs {
+            Ok(IntentActionsType::ConfigMultisig(ConfigMultisigArgs {
                 global: action.config.global,
                 members: action.config.members.iter().map(|member| (member.addr, member.weight, member.roles.contents.iter().map(|role| role.to_string()).collect())).collect(),
                 roles: action.config.roles.iter().map(|role| (role.name.to_string(), role.threshold)).collect(),
@@ -193,23 +196,23 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
         },
         "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ConfigDepsIntent" => {
             let action: ap::config::ConfigDepsAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::ConfigDeps(ConfigDepsArgs {
+            Ok(IntentActionsType::ConfigDeps(ConfigDepsArgs {
                 deps: action.deps.iter().map(|dep| (dep.name.to_owned(), dep.addr, dep.version)).collect(),
             }))
         },
         "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ToggleUnverifiedAllowedIntent" => {
             let _action: ap::config::ToggleUnverifiedAllowedAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedArgs {}))
+            Ok(IntentActionsType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedArgs {}))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::access_control_intents::BorrowCapIntent" => {
             let _action: aa::access_control::BorrowAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::BorrowCap(BorrowCapArgs {
+            Ok(IntentActionsType::BorrowCap(BorrowCapArgs {
                 cap_type: actions[0].0[0].to_string(),
             }))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::DisableRulesIntent" => {
             let action: aa::currency::DisableAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::DisableRules(DisableRulesArgs {
+            Ok(IntentActionsType::DisableRules(DisableRulesArgs {
                 coin_type: actions[0].0[0].to_string(),
                 mint: action.mint,
                 burn: action.burn,
@@ -221,7 +224,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::UpdateMetadataIntent" => {
             let action: aa::currency::UpdateAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::UpdateMetadata(UpdateMetadataArgs {
+            Ok(IntentActionsType::UpdateMetadata(UpdateMetadataArgs {
                 coin_type: actions[0].0[0].to_string(),
                 new_name: action.name,
                 new_symbol: action.symbol,
@@ -237,7 +240,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
                 transfers.push((mint.amount, transfer.recipient));
             }
 
-            Ok(IntentType::MintAndTransfer(MintAndTransferArgs { 
+            Ok(IntentActionsType::MintAndTransfer(MintAndTransferArgs { 
                 coin_type: actions[0].0[0].to_string(), 
                 transfers 
             }))
@@ -246,7 +249,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
             let mint: aa::currency::MintAction<()> = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentType::MintAndVest(MintAndVestArgs {
+            Ok(IntentActionsType::MintAndVest(MintAndVestArgs {
                 coin_type: actions[0].0[0].to_string(),
                 amount: mint.amount,
                 start: vest.start_timestamp,
@@ -258,7 +261,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let burn: aa::currency::BurnAction<()> = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentType::WithdrawAndBurn(WithdrawAndBurnArgs {
+            Ok(IntentActionsType::WithdrawAndBurn(WithdrawAndBurnArgs {
                 coin_type: actions[1].0[0].to_string(),
                 coin_id: withdraw.object_id.into(),
                 amount: burn.amount,
@@ -278,7 +281,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
                 nft_ids.push(take.nft_id.into());
             }
             
-            Ok(IntentType::TakeNfts(TakeNftsArgs {
+            Ok(IntentActionsType::TakeNfts(TakeNftsArgs {
                 kiosk_name,
                 nft_ids,
                 recipient,
@@ -295,7 +298,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
                 listings.push((list.nft_id.into(), list.price));
             }
             
-            Ok(IntentType::ListNfts(ListNftsArgs {
+            Ok(IntentActionsType::ListNfts(ListNftsArgs {
                 kiosk_name,
                 listings,
             }))
@@ -304,7 +307,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let deposit: aa::vault::DepositAction<()> = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultArgs { 
+            Ok(IntentActionsType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultArgs { 
                 coin_type: actions[0].0[0].to_string(), 
                 coin_id: withdraw.object_id.into(),
                 coin_amount: deposit.amount,
@@ -319,7 +322,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
                 transfers.push((withdraw.object_id.into(), transfer.recipient));
             }
 
-            Ok(IntentType::WithdrawAndTransfer(WithdrawAndTransferArgs { 
+            Ok(IntentActionsType::WithdrawAndTransfer(WithdrawAndTransferArgs { 
                 transfers
             }))
         },
@@ -327,7 +330,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentType::WithdrawAndVest(WithdrawAndVestArgs {
+            Ok(IntentActionsType::WithdrawAndVest(WithdrawAndVestArgs {
                 coin_id: withdraw.object_id.into(),
                 start: vest.start_timestamp,
                 end: vest.end_timestamp,
@@ -336,14 +339,14 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::UpgradePackageIntent" => {
             let upgrade: aa::package_upgrade::UpgradeAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::UpgradePackage(UpgradePackageArgs {
+            Ok(IntentActionsType::UpgradePackage(UpgradePackageArgs {
                 package_name: upgrade.name.to_owned(),
                 digest: upgrade.digest.to_vec(),
             }))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::RestrictPolicyIntent" => {
             let restrict: aa::package_upgrade::RestrictAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentType::RestrictPolicy(RestrictPolicyArgs {
+            Ok(IntentActionsType::RestrictPolicy(RestrictPolicyArgs {
                 package_name: restrict.name.to_owned(),
                 policy: Policy::try_from(restrict.policy)?,
             }))
@@ -360,7 +363,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
                 transfers.push((spend.amount, transfer.recipient));
             }
 
-            Ok(IntentType::SpendAndTransfer(SpendAndTransferArgs { 
+            Ok(IntentActionsType::SpendAndTransfer(SpendAndTransferArgs { 
                 vault_name,
                 coin_type: actions[0].0[0].to_string(),
                 transfers,
@@ -370,7 +373,7 @@ pub fn deserialize_action_args(move_intent_type: &str, actions: &[(Vec<TypeTag>,
             let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentType::SpendAndVest(SpendAndVestArgs {
+            Ok(IntentActionsType::SpendAndVest(SpendAndVestArgs {
                 vault_name: spend.name.to_owned(),
                 coin_type: actions[0].0[0].to_string(),
                 amount: spend.amount,
