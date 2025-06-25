@@ -4,10 +4,9 @@ pub mod move_binding;
 pub mod multisig;
 
 use anyhow::{anyhow, Ok, Result};
-use move_types::functions::{Arg, MutRef};
 use std::sync::Arc;
 use sui_graphql_client::Client;
-use sui_sdk_types::{Address, Object, ObjectData};
+use sui_sdk_types::{Address, ObjectData};
 use sui_transaction_builder::Serialized;
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
@@ -111,11 +110,7 @@ impl MultisigClient {
         let multisig_input = builder.input(self.multisig_as_input(true).await?);
         let key_input = builder.input(Serialized(&intent_key));
 
-        am::multisig::approve_intent(
-            builder, 
-            multisig_input.into(), 
-            key_input.into()
-        );
+        am::multisig::approve_intent(builder, multisig_input.into(), key_input.into());
 
         Ok(())
     }
@@ -128,11 +123,7 @@ impl MultisigClient {
         let multisig_input = builder.input(self.multisig_as_input(true).await?);
         let key_input = builder.input(Serialized(&intent_key));
 
-        am::multisig::disapprove_intent(
-            builder, 
-            multisig_input.into(), 
-            key_input.into()
-        );
+        am::multisig::disapprove_intent(builder, multisig_input.into(), key_input.into());
 
         Ok(())
     }
@@ -141,13 +132,25 @@ impl MultisigClient {
 
     // === Intent execution ===
 
-    pub fn execute_config_multisig(
-        self,
+    pub async fn execute_config_multisig(
+        &self,
         builder: &mut TransactionBuilder,
-        executable: MutRef<ap::executable::Executable<am::multisig::Approvals>>,
-        account: MutRef<ap::account::Account<am::multisig::Multisig>>,
-    ) {
-        am::config::execute_config_multisig(builder, executable, account);
+        intent_key: String,
+        clear: bool,
+    ) -> Result<()> {
+        intent_executor!(
+            builder,
+            self.multisig_as_input(true).await?,
+            self.clock_as_input().await?,
+            intent_key,
+            |executable, multisig| am::config::execute_config_multisig(
+                builder, executable, multisig
+            ),
+            |expired| am::config::delete_config_multisig(builder, expired),
+            clear
+        );
+
+        Ok(())
     }
 
     // === Intent deletion ===
@@ -197,23 +200,46 @@ impl MultisigClient {
 
         Ok(Input::from(clock_obj).by_ref())
     }
+}
 
-    async fn execute_intent(
-        &self, 
-        builder: &mut TransactionBuilder, 
-        intent_key: String,
-    ) -> Result<Arg<ap::executable::Executable<am::multisig::Approvals>>> {
-        let multisig_input = builder.input(self.multisig_as_input(true).await?);
-        let key_input = builder.input(Serialized(&intent_key));
-        let clock_input = builder.input(self.clock_as_input().await?);
-        
-        let executable = am::multisig::execute_intent(
-            builder, 
-            multisig_input.into(), 
+#[macro_export]
+macro_rules! intent_executor {
+    (
+        $builder:expr, 
+        $multisig_input:expr, 
+        $clock_input:expr, 
+        $intent_key:expr, 
+        $execute:expr, 
+        $delete:expr, 
+        $clear:expr
+    ) => {
+        let multisig_input = $builder.input($multisig_input);
+        let clock_input = $builder.input($clock_input);
+        let key_input = $builder.input(Serialized(&$intent_key));
+
+        let mut executable = am::multisig::execute_intent(
+            $builder,
+            multisig_input.into(),
             key_input.into(),
-            clock_input.into()
+            clock_input.into(),
         );
 
-        Ok(executable)
-    }
+        $execute(executable.borrow_mut(), multisig_input.into());
+
+        ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
+            $builder,
+            multisig_input.into(),
+            executable,
+        );
+
+        if $clear {
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >($builder, multisig_input.into(), key_input.into());
+
+            $delete(expired.borrow_mut());
+            ap::intents::destroy_empty_expired($builder, expired);
+        }
+    };
 }
