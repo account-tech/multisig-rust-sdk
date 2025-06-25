@@ -186,6 +186,21 @@ impl MultisigClient {
 
     // === Intent deletion ===
 
+    pub async fn delete_config_multisig(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_key: String,
+    ) -> Result<()> {
+        intent_cleaner!(
+            builder, 
+            self.multisig_as_input(true).await?, 
+            self.clock_as_input().await?, 
+            intent_key, 
+            |expired| am::config::delete_config_multisig(builder, expired)
+        );
+        Ok(())
+    }
+
     // === Getters ===
 
     pub fn sui(&self) -> &Client {
@@ -301,5 +316,28 @@ macro_rules! intent_executor {
             $delete(expired.borrow_mut());
             ap::intents::destroy_empty_expired($builder, expired);
         }
+    };
+}
+
+#[macro_export]
+macro_rules! intent_cleaner {
+    (
+        $builder:expr, 
+        $multisig_input:expr, 
+        $clock_input:expr, 
+        $intent_key:expr, 
+        $delete:expr
+    ) => {
+        let multisig_input = $builder.input($multisig_input);
+        let clock_input = $builder.input($clock_input);
+        let key_input = $builder.input(Serialized(&$intent_key));
+
+        let mut expired = ap::account::delete_expired_intent::<
+            am::multisig::Multisig,
+            am::multisig::Approvals,
+        >($builder, multisig_input.into(), key_input.into(), clock_input.into());
+
+        $delete(expired.borrow_mut());
+        ap::intents::destroy_empty_expired($builder, expired);
     };
 }
