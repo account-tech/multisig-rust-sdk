@@ -1,9 +1,6 @@
 use anyhow::Ok;
 use anyhow::{anyhow, Result};
-use move_types::functions::{Arg, MutRef};
 use sui_sdk_types::{Address, TypeTag};
-use sui_transaction_builder::unresolved::Input;
-use sui_transaction_builder::TransactionBuilder;
 
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_actions as aa;
@@ -11,54 +8,54 @@ use crate::move_binding::account_multisig as am;
 
 #[derive(Debug, Clone)]
 pub enum IntentActionsType {
-    ConfigMultisig(ConfigMultisigArgs),
-    ConfigDeps(ConfigDepsArgs),
-    ToggleUnverifiedAllowed(ToggleUnverifiedAllowedArgs),
+    ConfigMultisig(ConfigMultisigFields),
+    ConfigDeps(ConfigDepsFields),
+    ToggleUnverifiedAllowed(ToggleUnverifiedAllowedFields),
 
-    BorrowCap(BorrowCapArgs),
+    BorrowCap(BorrowCapFields),
 
-    DisableRules(DisableRulesArgs),
-    UpdateMetadata(UpdateMetadataArgs),
-    MintAndTransfer(MintAndTransferArgs),
-    MintAndVest(MintAndVestArgs),
-    WithdrawAndBurn(WithdrawAndBurnArgs),
+    DisableRules(DisableRulesFields),
+    UpdateMetadata(UpdateMetadataFields),
+    MintAndTransfer(MintAndTransferFields),
+    MintAndVest(MintAndVestFields),
+    WithdrawAndBurn(WithdrawAndBurnFields),
     
-    TakeNfts(TakeNftsArgs),
-    ListNfts(ListNftsArgs),
+    TakeNfts(TakeNftsFields),
+    ListNfts(ListNftsFields),
 
-    WithdrawAndTransferToVault(WithdrawAndTransferToVaultArgs),
-    WithdrawAndTransfer(WithdrawAndTransferArgs),
-    WithdrawAndVest(WithdrawAndVestArgs),
+    WithdrawAndTransferToVault(WithdrawAndTransferToVaultFields),
+    WithdrawAndTransfer(WithdrawAndTransferFields),
+    WithdrawAndVest(WithdrawAndVestFields),
     
-    SpendAndTransfer(SpendAndTransferArgs),
-    SpendAndVest(SpendAndVestArgs),
+    SpendAndTransfer(SpendAndTransferFields),
+    SpendAndVest(SpendAndVestFields),
     
-    UpgradePackage(UpgradePackageArgs), 
-    RestrictPolicy(RestrictPolicyArgs),
+    UpgradePackage(UpgradePackageFields), 
+    RestrictPolicy(RestrictPolicyFields),
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigMultisigArgs {
+pub struct ConfigMultisigFields {
     pub global: u64,
     pub members: Vec<(Address, u64, Vec<String>)>,
     pub roles: Vec<(String, u64)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigDepsArgs {
+pub struct ConfigDepsFields {
     pub deps: Vec<(String, Address, u64)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ToggleUnverifiedAllowedArgs {}
+pub struct ToggleUnverifiedAllowedFields {}
 
 #[derive(Debug, Clone)]
-pub struct BorrowCapArgs {
+pub struct BorrowCapFields {
     pub cap_type: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct DisableRulesArgs {
+pub struct DisableRulesFields {
     pub coin_type: String,
     pub mint: bool,
     pub burn: bool,
@@ -69,7 +66,7 @@ pub struct DisableRulesArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct UpdateMetadataArgs {
+pub struct UpdateMetadataFields {
     pub coin_type: String,
     pub new_name: Option<String>,
     pub new_symbol: Option<String>,
@@ -78,13 +75,13 @@ pub struct UpdateMetadataArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct MintAndTransferArgs {
+pub struct MintAndTransferFields {
     pub coin_type: String,
     pub transfers: Vec<(u64, Address)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MintAndVestArgs {
+pub struct MintAndVestFields {
     pub coin_type: String,
     pub amount: u64,
     pub start: u64, // ms
@@ -93,27 +90,27 @@ pub struct MintAndVestArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct WithdrawAndBurnArgs {
+pub struct WithdrawAndBurnFields {
     pub coin_type: String,
     pub coin_id: Address,
     pub amount: u64,
 }
 
 #[derive(Debug, Clone)]
-pub struct TakeNftsArgs {
+pub struct TakeNftsFields {
     pub kiosk_name: String,
     pub nft_ids: Vec<Address>,
     pub recipient: Address,
 }
 
 #[derive(Debug, Clone)]
-pub struct ListNftsArgs {
+pub struct ListNftsFields {
     pub kiosk_name: String,
     pub listings: Vec<(Address, u64)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct WithdrawAndTransferToVaultArgs {
+pub struct WithdrawAndTransferToVaultFields {
     pub coin_type: String,
     pub coin_id: Address,
     pub coin_amount: u64,
@@ -121,12 +118,12 @@ pub struct WithdrawAndTransferToVaultArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct WithdrawAndTransferArgs {
+pub struct WithdrawAndTransferFields {
     pub transfers: Vec<(Address, Address)>, // object to address
 }
 
 #[derive(Debug, Clone)]
-pub struct WithdrawAndVestArgs {
+pub struct WithdrawAndVestFields {
     pub coin_id: Address,
     pub start: u64, // ms
     pub end: u64, // ms
@@ -134,14 +131,14 @@ pub struct WithdrawAndVestArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct SpendAndTransferArgs {
+pub struct SpendAndTransferFields {
     pub vault_name: String,
     pub coin_type: String,
     pub transfers: Vec<(u64, Address)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct SpendAndVestArgs {
+pub struct SpendAndVestFields {
     pub vault_name: String,
     pub coin_type: String,
     pub amount: u64,
@@ -151,13 +148,13 @@ pub struct SpendAndVestArgs {
 }
 
 #[derive(Debug, Clone)]
-pub struct UpgradePackageArgs {
+pub struct UpgradePackageFields {
     pub package_name: String,
     pub digest: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-pub struct RestrictPolicyArgs {
+pub struct RestrictPolicyFields {
     pub package_name: String,
     pub policy: Policy,
 }
@@ -188,7 +185,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
     match move_intent_type {
         "460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config::ConfigMultisigIntent" => {
             let action: am::config::ConfigMultisigAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ConfigMultisig(ConfigMultisigArgs {
+            Ok(IntentActionsType::ConfigMultisig(ConfigMultisigFields {
                 global: action.config.global,
                 members: action.config.members.iter().map(|member| (member.addr, member.weight, member.roles.contents.iter().map(|role| role.to_string()).collect())).collect(),
                 roles: action.config.roles.iter().map(|role| (role.name.to_string(), role.threshold)).collect(),
@@ -196,23 +193,23 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
         },
         "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ConfigDepsIntent" => {
             let action: ap::config::ConfigDepsAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ConfigDeps(ConfigDepsArgs {
+            Ok(IntentActionsType::ConfigDeps(ConfigDepsFields {
                 deps: action.deps.iter().map(|dep| (dep.name.to_owned(), dep.addr, dep.version)).collect(),
             }))
         },
         "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ToggleUnverifiedAllowedIntent" => {
             let _action: ap::config::ToggleUnverifiedAllowedAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedArgs {}))
+            Ok(IntentActionsType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedFields {}))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::access_control_intents::BorrowCapIntent" => {
             let _action: aa::access_control::BorrowAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::BorrowCap(BorrowCapArgs {
+            Ok(IntentActionsType::BorrowCap(BorrowCapFields {
                 cap_type: actions[0].0[0].to_string(),
             }))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::DisableRulesIntent" => {
             let action: aa::currency::DisableAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::DisableRules(DisableRulesArgs {
+            Ok(IntentActionsType::DisableRules(DisableRulesFields {
                 coin_type: actions[0].0[0].to_string(),
                 mint: action.mint,
                 burn: action.burn,
@@ -224,7 +221,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::UpdateMetadataIntent" => {
             let action: aa::currency::UpdateAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::UpdateMetadata(UpdateMetadataArgs {
+            Ok(IntentActionsType::UpdateMetadata(UpdateMetadataFields {
                 coin_type: actions[0].0[0].to_string(),
                 new_name: action.name,
                 new_symbol: action.symbol,
@@ -240,7 +237,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
                 transfers.push((mint.amount, transfer.recipient));
             }
 
-            Ok(IntentActionsType::MintAndTransfer(MintAndTransferArgs { 
+            Ok(IntentActionsType::MintAndTransfer(MintAndTransferFields { 
                 coin_type: actions[0].0[0].to_string(), 
                 transfers 
             }))
@@ -249,7 +246,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
             let mint: aa::currency::MintAction<()> = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentActionsType::MintAndVest(MintAndVestArgs {
+            Ok(IntentActionsType::MintAndVest(MintAndVestFields {
                 coin_type: actions[0].0[0].to_string(),
                 amount: mint.amount,
                 start: vest.start_timestamp,
@@ -261,7 +258,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let burn: aa::currency::BurnAction<()> = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentActionsType::WithdrawAndBurn(WithdrawAndBurnArgs {
+            Ok(IntentActionsType::WithdrawAndBurn(WithdrawAndBurnFields {
                 coin_type: actions[1].0[0].to_string(),
                 coin_id: withdraw.object_id.into(),
                 amount: burn.amount,
@@ -281,7 +278,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
                 nft_ids.push(take.nft_id.into());
             }
             
-            Ok(IntentActionsType::TakeNfts(TakeNftsArgs {
+            Ok(IntentActionsType::TakeNfts(TakeNftsFields {
                 kiosk_name,
                 nft_ids,
                 recipient,
@@ -298,7 +295,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
                 listings.push((list.nft_id.into(), list.price));
             }
             
-            Ok(IntentActionsType::ListNfts(ListNftsArgs {
+            Ok(IntentActionsType::ListNfts(ListNftsFields {
                 kiosk_name,
                 listings,
             }))
@@ -307,7 +304,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let deposit: aa::vault::DepositAction<()> = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentActionsType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultArgs { 
+            Ok(IntentActionsType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultFields { 
                 coin_type: actions[0].0[0].to_string(), 
                 coin_id: withdraw.object_id.into(),
                 coin_amount: deposit.amount,
@@ -322,7 +319,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
                 transfers.push((withdraw.object_id.into(), transfer.recipient));
             }
 
-            Ok(IntentActionsType::WithdrawAndTransfer(WithdrawAndTransferArgs { 
+            Ok(IntentActionsType::WithdrawAndTransfer(WithdrawAndTransferFields { 
                 transfers
             }))
         },
@@ -330,7 +327,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
             let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentActionsType::WithdrawAndVest(WithdrawAndVestArgs {
+            Ok(IntentActionsType::WithdrawAndVest(WithdrawAndVestFields {
                 coin_id: withdraw.object_id.into(),
                 start: vest.start_timestamp,
                 end: vest.end_timestamp,
@@ -339,14 +336,14 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::UpgradePackageIntent" => {
             let upgrade: aa::package_upgrade::UpgradeAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::UpgradePackage(UpgradePackageArgs {
+            Ok(IntentActionsType::UpgradePackage(UpgradePackageFields {
                 package_name: upgrade.name.to_owned(),
                 digest: upgrade.digest.to_vec(),
             }))
         },
         "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::RestrictPolicyIntent" => {
             let restrict: aa::package_upgrade::RestrictAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::RestrictPolicy(RestrictPolicyArgs {
+            Ok(IntentActionsType::RestrictPolicy(RestrictPolicyFields {
                 package_name: restrict.name.to_owned(),
                 policy: Policy::try_from(restrict.policy)?,
             }))
@@ -363,7 +360,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
                 transfers.push((spend.amount, transfer.recipient));
             }
 
-            Ok(IntentActionsType::SpendAndTransfer(SpendAndTransferArgs { 
+            Ok(IntentActionsType::SpendAndTransfer(SpendAndTransferFields { 
                 vault_name,
                 coin_type: actions[0].0[0].to_string(),
                 transfers,
@@ -373,7 +370,7 @@ pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec
             let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&actions[0].1)?;
             let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
 
-            Ok(IntentActionsType::SpendAndVest(SpendAndVestArgs {
+            Ok(IntentActionsType::SpendAndVest(SpendAndVestFields {
                 vault_name: spend.name.to_owned(),
                 coin_type: actions[0].0[0].to_string(),
                 amount: spend.amount,

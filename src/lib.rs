@@ -2,9 +2,10 @@ pub mod actions;
 pub mod intents;
 pub mod move_binding;
 pub mod multisig;
+pub mod params;
 
-use anyhow::{anyhow, Ok, Result};
 use std::sync::Arc;
+use anyhow::{anyhow, Ok, Result};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, ObjectData};
 use sui_transaction_builder::Serialized;
@@ -15,6 +16,7 @@ use crate::move_binding::sui;
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::multisig::Multisig;
+use crate::params::{ConfigMultisigArgs, ParamsArgs};
 
 pub struct MultisigClient {
     sui_client: Arc<Client>,
@@ -130,6 +132,36 @@ impl MultisigClient {
 
     // === Intent request ===
 
+    pub async fn request_config_multisig(
+        &self,
+        builder: &mut TransactionBuilder,
+        params_args: ParamsArgs,
+        config_multisig_args: ConfigMultisigArgs,
+    ) -> Result<()> {
+        intent_builder!(
+            builder,
+            self.multisig_as_input(true).await?,
+            self.clock_as_input().await?,
+            params_args,
+            |builder, auth, multisig_input, params, outcome| {
+                am::config::request_config_multisig(
+                    builder, 
+                    auth, 
+                    multisig_input, 
+                    params, 
+                    outcome, 
+                    config_multisig_args.addresses, 
+                    config_multisig_args.weights, 
+                    config_multisig_args.roles, 
+                    config_multisig_args.global, 
+                    config_multisig_args.role_names, 
+                    config_multisig_args.role_thresholds
+                )
+            }
+        );
+        Ok(())
+    }
+
     // === Intent execution ===
 
     pub async fn execute_config_multisig(
@@ -149,7 +181,6 @@ impl MultisigClient {
             |expired| am::config::delete_config_multisig(builder, expired),
             clear
         );
-
         Ok(())
     }
 
@@ -200,6 +231,35 @@ impl MultisigClient {
 
         Ok(Input::from(clock_obj).by_ref())
     }
+}
+
+#[macro_export]
+macro_rules! intent_builder {
+    (
+        $builder:expr,
+        $multisig_input:expr,
+        $clock_input:expr,
+        $params_args:expr,
+        $request:expr
+    ) => {
+        let multisig_input = $builder.input($multisig_input);
+        let clock_input = $builder.input($clock_input);
+
+        let auth = am::multisig::authenticate($builder, multisig_input.into());
+
+        let params = ap::intents::new_params(
+            $builder,
+            $params_args.key,
+            $params_args.description,
+            $params_args.execution_times,
+            $params_args.expiration_time,
+            clock_input.into(),
+        );
+
+        let outcome = am::multisig::empty_outcome($builder);
+
+        $request($builder, auth, multisig_input.into(), params, outcome);
+    };
 }
 
 #[macro_export]
