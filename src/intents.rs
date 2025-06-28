@@ -39,15 +39,17 @@ pub struct Approvals {
 }
 
 impl Intents {
-    pub fn new(sui_client: Arc<Client>, bag_id: Address) -> Self {
-        Self {
+    pub async fn from_bag_id(sui_client: Arc<Client>, bag_id: Address) -> Result<Self> {
+        let mut intents = Self {
             sui_client,
             bag_id,
             intents: HashMap::new(),
-        }
+        };
+        intents.refresh().await?;
+        Ok(intents)
     }
 
-    pub async fn fetch(&mut self) -> Result<()> {
+    pub async fn refresh(&mut self) -> Result<()> {
         let mut cursor = None;
         let mut has_next_page = true;
 

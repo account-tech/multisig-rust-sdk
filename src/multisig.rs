@@ -9,19 +9,21 @@ use sui_sdk_types::{ObjectData, Address};
 use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_multisig as am;
 use crate::intents::Intents;
+use crate::owned_objects::OwnedObjects;
 
 pub struct Multisig {
-    sui_client: Arc<Client>,
-    fee_amount: u64,
-    fee_recipient: Address,
-    id: Address,
-    metadata: HashMap<String, String>,
-    deps: Vec<Dep>,
-    unverified_deps_allowed: bool,
-    intents_bag_id: Address,
-    locked_objects: Vec<Address>,
-    config: Config,
-    intents: Option<Intents>, // if None then not fetched yet
+    pub sui_client: Arc<Client>,
+    pub fee_amount: u64,
+    pub fee_recipient: Address,
+    pub id: Address,
+    pub metadata: HashMap<String, String>,
+    pub deps: Vec<Dep>,
+    pub unverified_deps_allowed: bool,
+    pub intents_bag_id: Address,
+    pub locked_objects: Vec<Address>,
+    pub config: Config,
+    pub intents: Option<Intents>, // if None then not fetched yet
+    pub owned_objects: Option<OwnedObjects>, // if None then not fetched yet
 }
 
 #[derive(Debug)]
@@ -73,6 +75,7 @@ impl Multisig {
             locked_objects: Vec::new(),
             config: Config::default(),
             intents: None,
+            owned_objects: None,
         };
 
         multisig.refresh().await?;
@@ -157,9 +160,13 @@ impl Multisig {
 
         // --- Intents ---
 
-        let mut intents = Intents::new(self.sui_client.clone(), self.intents_bag_id);
-        intents.fetch().await?;
+        let intents = Intents::from_bag_id(self.sui_client.clone(), self.intents_bag_id).await?;
         self.intents = Some(intents);
+
+        // --- Owned Objects ---
+
+        let owned_objects = OwnedObjects::from_multisig_id(self.sui_client.clone(), self.id).await?;
+        self.owned_objects = Some(owned_objects);
 
         // --- Fees ---
 
@@ -184,48 +191,6 @@ impl Multisig {
 
         Ok(())
     }
-
-    // === Getters ===
-
-    pub fn fee_amount(&self) -> u64 {
-        self.fee_amount
-    }
-
-    pub fn fee_recipient(&self) -> &Address {
-        &self.fee_recipient
-    }
-
-    pub fn id(&self) -> Address {
-        self.id
-    }
-
-    pub fn metadata(&self) -> &HashMap<String, String> {
-        &self.metadata
-    }
-
-    pub fn deps(&self) -> &Vec<Dep> {
-        &self.deps
-    }
-
-    pub fn unverified_deps_allowed(&self) -> bool {
-        self.unverified_deps_allowed
-    }
-
-    pub fn intents_bag_id(&self) -> Address {
-        self.intents_bag_id
-    }
-
-    pub fn locked_objects(&self) -> &Vec<Address> {
-        &self.locked_objects
-    }
-
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
-
-    pub fn intents(&self) -> &Option<Intents> {
-        &self.intents
-    }
 }
 
 impl fmt::Debug for Multisig {
@@ -241,6 +206,7 @@ impl fmt::Debug for Multisig {
             .field("locked_objects", &self.locked_objects)
             .field("config", &self.config)
             .field("intents", &self.intents)
+            .field("owned_objects", &self.owned_objects)
             .finish()
     }
 }

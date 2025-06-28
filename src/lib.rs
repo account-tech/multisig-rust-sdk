@@ -3,6 +3,8 @@ pub mod intents;
 pub mod move_binding;
 pub mod multisig;
 pub mod params;
+pub mod owned_objects;
+pub mod dynamic_fields;
 
 use anyhow::{anyhow, Ok, Result};
 use std::sync::Arc;
@@ -13,10 +15,11 @@ use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
 use crate::move_binding::sui;
 // use crate::move_binding::account_extensions as ae;
-use crate::intents::{Intent, Intents};
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::multisig::Multisig;
+use crate::owned_objects::OwnedObjects;
+use crate::intents::{Intent, Intents};
 use crate::params::{ConfigMultisigArgs, ParamsArgs};
 
 pub struct MultisigClient {
@@ -169,15 +172,19 @@ impl MultisigClient {
     }
 
     pub fn multisig_id(&self) -> Option<Address> {
-        self.multisig.as_ref().map(|m| m.id())
+        self.multisig.as_ref().map(|m| m.id)
     }
 
     pub fn intents(&self) -> Option<&Intents> {
-        self.multisig.as_ref()?.intents().as_ref()
+        self.multisig.as_ref()?.intents.as_ref()
     }
 
     pub fn intent(&self, key: &str) -> Option<&Intent> {
         self.intents().and_then(|i| i.get_intent(key))
+    }
+
+    pub fn owned_objects(&self) -> Option<&OwnedObjects> {
+        self.multisig.as_ref()?.owned_objects.as_ref()
     }
 
     // === Helpers ===
@@ -403,14 +410,7 @@ mod tests {
         client.load_multisig(multisig_id).await.unwrap();
 
         assert!(client.multisig().is_some());
-        assert!(client
-            .multisig()
-            .as_ref()
-            .unwrap()
-            .intents()
-            .as_ref()
-            .unwrap()
-            .intents
-            .is_empty());
+        assert!(client.intents().is_some());
+        assert!(client.owned_objects().is_some());
     }
 }
