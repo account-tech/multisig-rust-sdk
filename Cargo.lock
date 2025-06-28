@@ -12,6 +12,7 @@ dependencies = [
  "move-binding-derive",
  "move-types",
  "paste",
+ "rand 0.8.5",
  "serde",
  "sui-crypto",
  "sui-graphql-client",

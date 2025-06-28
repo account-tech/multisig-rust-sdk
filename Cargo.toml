@@ -25,3 +25,4 @@ paste = "1.0.15"
 [dev-dependencies]
 sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="f0c8068", features = ["ed25519"] }
 base64ct = { version = "1.6", features = ["std"] }
+rand = "0.8.0"
