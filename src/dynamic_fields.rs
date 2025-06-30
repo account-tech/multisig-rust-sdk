@@ -102,10 +102,10 @@ impl DynamicFields {
                     let value_bcs = df_output.value.as_ref().ok_or(anyhow!("Couldn't get dynamic field bcs"))?.1.as_ref();
 
                     match type_name.as_str() {
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::access_control::CapKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::access_control::CapKey" => {
                             self.caps.push(Cap { type_: generic });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::currency::TreasuryCapKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency::TreasuryCapKey" => {
                             let treasury_cap: sui::coin::TreasuryCap<()> = bcs::from_bytes(value_bcs)?;
                             self
                                 .currencies
@@ -124,7 +124,7 @@ impl DynamicFields {
                                     can_update_icon: false,
                                 });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::currency::CurrencyRulesKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency::CurrencyRulesKey" => {
                             let currency_rules: aa::currency::CurrencyRules<()> = bcs::from_bytes(value_bcs)?;
                             self
                                 .currencies
@@ -153,7 +153,7 @@ impl DynamicFields {
                                     can_update_icon: currency_rules.can_update_icon,
                                 });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::kiosk::KioskOwnerKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::kiosk::KioskOwnerKey" => {
                             let kiosk_owner_key: aa::kiosk::KioskOwnerKey = bcs::from_bytes(key_bcs)?;
                             let kiosk_owner_cap: sui::kiosk::KioskOwnerCap = bcs::from_bytes(value_bcs)?;
 
@@ -162,7 +162,7 @@ impl DynamicFields {
                                 cap: kiosk_owner_cap.for_.into(),
                             });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::package_upgrade::UpgradeCapKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade::UpgradeCapKey" => {
                             let upgrade_cap_key: aa::package_upgrade::UpgradeCapKey = bcs::from_bytes(key_bcs)?;
                             let upgrade_cap: sui::package::UpgradeCap = bcs::from_bytes(value_bcs)?;
                             
@@ -181,7 +181,7 @@ impl DynamicFields {
                                     delay_ms: 0,
                                 });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::package_upgrade::UpgradeRulesKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade::UpgradeRulesKey" => {
                             let upgrade_rules_key: aa::package_upgrade::UpgradeRulesKey = bcs::from_bytes(key_bcs)?;
                             let upgrade_rules: aa::package_upgrade::UpgradeRules = bcs::from_bytes(value_bcs)?;
                             
@@ -196,7 +196,7 @@ impl DynamicFields {
                                     delay_ms: upgrade_rules.delay_ms,
                                 });
                         },
-                        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::vault::VaultKey" => {
+                        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::vault::VaultKey" => {
                             let vault_key: aa::vault::VaultKey = bcs::from_bytes(key_bcs)?;
                             let vault_bag: sui::bag::Bag = bcs::from_bytes(value_bcs)?;
 
