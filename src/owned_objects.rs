@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use cynic::QueryBuilder;
 use serde_json::{Map, Value};
 use std::fmt;
@@ -57,7 +57,7 @@ impl OwnedObjects {
 
             let response = self.sui_client.run_query(&operation).await?;
             if let Some(errors) = response.errors {
-                return Err(anyhow::anyhow!("GraphQL error: {:?}", errors));
+                return Err(anyhow!("GraphQL error: {:?}", errors));
             }
 
             if let Some(objects) = response.data {
@@ -65,17 +65,17 @@ impl OwnedObjects {
                     let contents = object
                         .as_move_object
                         .and_then(|move_object| move_object.contents)
-                        .ok_or(anyhow::anyhow!("Could not get object type"))?;
+                        .ok_or(anyhow!("Could not get object type"))?;
 
                     let fields = contents
                         .json
                         .and_then(|json| json.as_object().cloned())
-                        .ok_or(anyhow::anyhow!("Could not parse object"))?;
+                        .ok_or(anyhow!("Could not parse object"))?;
 
                     let id = fields
                         .get("id")
                         .and_then(|id| id.as_str())
-                        .ok_or(anyhow::anyhow!("Could not get object id"))?
+                        .ok_or(anyhow!("Could not get object id"))?
                         .parse::<Address>()?;
 
                     let type_ = contents.type_.repr;
@@ -85,7 +85,7 @@ impl OwnedObjects {
                             .get("balance")
                             .and_then(|bal| bal.get("value"))
                             .and_then(|v| v.as_str())
-                            .ok_or(anyhow::anyhow!("Could not get coin balance"))?
+                            .ok_or(anyhow!("Could not get coin balance"))?
                             .parse::<u64>()?;
                         self.coins.push(Coin { type_, id, balance });
                     } else {

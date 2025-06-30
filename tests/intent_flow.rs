@@ -87,17 +87,17 @@ async fn test_config_multisig_intent() {
         // check results
         client.refresh().await.unwrap();
         assert!(client.intent("config_multisig").is_none());
-        assert_eq!(client.multisig().unwrap().config().members.len(), 2);
-        assert_eq!(client.multisig().unwrap().config().members[0].address, address.to_string());
-        assert_eq!(client.multisig().unwrap().config().members[0].weight, 2);
-        assert_eq!(client.multisig().unwrap().config().members[0].roles, vec!["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config".to_string()]);
-        assert_eq!(client.multisig().unwrap().config().members[1].address, Address::ZERO.to_string());
-        assert_eq!(client.multisig().unwrap().config().members[1].weight, 1);
-        assert_eq!(client.multisig().unwrap().config().members[1].roles, Vec::<String>::new());
-        assert_eq!(client.multisig().unwrap().config().global.threshold, 2);
-        assert_eq!(client.multisig().unwrap().config().global.total_weight, 3);
-        assert_eq!(client.multisig().unwrap().config().roles.len(), 1);
-        assert_eq!(client.multisig().unwrap().config().roles["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config"].threshold, 1);
-        assert_eq!(client.multisig().unwrap().config().roles["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config"].total_weight, 2);
+        assert_eq!(client.multisig().unwrap().config.members.len(), 2);
+        assert_eq!(client.multisig().unwrap().config.members[0].address, address.to_string());
+        assert_eq!(client.multisig().unwrap().config.members[0].weight, 2);
+        assert_eq!(client.multisig().unwrap().config.members[0].roles, vec!["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config".to_string()]);
+        assert_eq!(client.multisig().unwrap().config.members[1].address, Address::ZERO.to_string());
+        assert_eq!(client.multisig().unwrap().config.members[1].weight, 1);
+        assert_eq!(client.multisig().unwrap().config.members[1].roles, Vec::<String>::new());
+        assert_eq!(client.multisig().unwrap().config.global.threshold, 2);
+        assert_eq!(client.multisig().unwrap().config.global.total_weight, 3);
+        assert_eq!(client.multisig().unwrap().config.roles.len(), 1);
+        assert_eq!(client.multisig().unwrap().config.roles["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config"].threshold, 1);
+        assert_eq!(client.multisig().unwrap().config.roles["460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config"].total_weight, 2);
     }
 }

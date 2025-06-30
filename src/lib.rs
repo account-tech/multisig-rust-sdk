@@ -18,9 +18,13 @@ use crate::move_binding::sui;
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::multisig::Multisig;
-use crate::owned_objects::OwnedObjects;
 use crate::intents::{Intent, Intents};
 use crate::params::{ConfigMultisigArgs, ParamsArgs};
+use crate::owned_objects::OwnedObjects;
+use crate::dynamic_fields::DynamicFields;
+
+// TODO: MultisigCreateBuilder 
+// TODO: dfs, intents, commands, User
 
 pub struct MultisigClient {
     sui_client: Arc<Client>,
@@ -185,6 +189,10 @@ impl MultisigClient {
 
     pub fn owned_objects(&self) -> Option<&OwnedObjects> {
         self.multisig.as_ref()?.owned_objects.as_ref()
+    }
+
+    pub fn dynamic_fields(&self) -> Option<&DynamicFields> {
+        self.multisig.as_ref()?.dynamic_fields.as_ref()
     }
 
     // === Helpers ===

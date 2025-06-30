@@ -10,6 +10,7 @@ use crate::move_binding::account_protocol as ap;
 use crate::move_binding::account_multisig as am;
 use crate::intents::Intents;
 use crate::owned_objects::OwnedObjects;
+use crate::dynamic_fields::DynamicFields;
 
 pub struct Multisig {
     pub sui_client: Arc<Client>,
@@ -24,6 +25,7 @@ pub struct Multisig {
     pub config: Config,
     pub intents: Option<Intents>, // if None then not fetched yet
     pub owned_objects: Option<OwnedObjects>, // if None then not fetched yet
+    pub dynamic_fields: Option<DynamicFields>, // if None then not fetched yet
 }
 
 #[derive(Debug)]
@@ -76,6 +78,7 @@ impl Multisig {
             config: Config::default(),
             intents: None,
             owned_objects: None,
+            dynamic_fields: None,
         };
 
         multisig.refresh().await?;
@@ -168,6 +171,11 @@ impl Multisig {
         let owned_objects = OwnedObjects::from_multisig_id(self.sui_client.clone(), self.id).await?;
         self.owned_objects = Some(owned_objects);
 
+        // --- Dynamic Fields ---
+
+        let dynamic_fields = DynamicFields::from_multisig_id(self.sui_client.clone(), self.id).await?;
+        self.dynamic_fields = Some(dynamic_fields);
+
         // --- Fees ---
 
         // fetch the Fees object
@@ -207,6 +215,7 @@ impl fmt::Debug for Multisig {
             .field("config", &self.config)
             .field("intents", &self.intents)
             .field("owned_objects", &self.owned_objects)
+            .field("dynamic_fields", &self.dynamic_fields)
             .finish()
     }
 }
