@@ -11,6 +11,7 @@ use crate::move_binding::account_multisig as am;
 use crate::intents::Intents;
 use crate::owned_objects::OwnedObjects;
 use crate::dynamic_fields::DynamicFields;
+use crate::utils;
 
 pub struct Multisig {
     pub sui_client: Arc<Client>,
@@ -90,15 +91,10 @@ impl Multisig {
         // --- Account<Multisig> ---
 
         // fetch Account<Multisig> object
-        let resp = self
-            .sui_client
-            .object(self.id, None)
-            .await
-            .map_err(|e| anyhow!("Failed to fetch multisig object: {}", e))?
-            .ok_or_else(|| anyhow!("Multisig object not found"))?;
+        let multisig_obj = utils::get_object(&self.sui_client, self.id).await?;
 
         // parse the Account<Multisig> object
-        if let ObjectData::Struct(obj) = resp.data() {
+        if let ObjectData::Struct(obj) = multisig_obj.data() {
             let multisig: ap::account::Account<am::multisig::Multisig> = bcs::from_bytes(obj.contents())
                 .map_err(|e| anyhow!("Failed to parse multisig object: {}", e))?;
 
@@ -157,8 +153,6 @@ impl Multisig {
                         .total_weight += member.weight;
                 }
             }
-        } else {
-            return Err(anyhow!("Multisig not a MoveObject"));
         }
 
         // --- Intents ---
@@ -179,22 +173,15 @@ impl Multisig {
         // --- Fees ---
 
         // fetch the Fees object
-        let contents = self
-            .sui_client
-            .move_object_contents_bcs(Address::from_hex(Self::FEE_OBJECT).unwrap(), None)
-            .await
-            .map_err(|e| anyhow!("Failed to fetch fees object: {}", e))?;
+        let fee_obj = utils::get_object(&self.sui_client, Address::from_hex(Self::FEE_OBJECT).unwrap()).await?;
 
         // parse the Fees object
-        match contents {
-            Some(contents) => {
-                let fees: am::fees::Fees = bcs::from_bytes(&contents)
-                    .map_err(|e| anyhow!("Failed to parse fees object: {}", e))?;   
+        if let ObjectData::Struct(obj) = fee_obj.data() {
+            let fees: am::fees::Fees = bcs::from_bytes(obj.contents())
+                .map_err(|e| anyhow!("Failed to parse fees object: {}", e))?;   
         
                 self.fee_amount = fees.amount;
                 self.fee_recipient = fees.recipient;
-            }
-            None => return Err(anyhow!("Fees not a MoveObject"))
         }
 
         Ok(())
