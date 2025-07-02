@@ -11,7 +11,7 @@ use anyhow::{anyhow, Ok, Result};
 use move_types::TypeTag;
 use std::{str::FromStr, sync::Arc};
 use sui_graphql_client::Client;
-use sui_sdk_types::{Address, Argument, Object, ObjectData};
+use sui_sdk_types::{Address, Argument, ObjectData};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 use sui_transaction_builder::{Function, Serialized};
 
