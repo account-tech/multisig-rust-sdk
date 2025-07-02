@@ -1,12 +1,11 @@
 use anyhow::{anyhow, Result};
-use cynic::QueryBuilder;
 use serde_json::{Map, Value};
 use std::fmt;
 use std::sync::Arc;
-
-use sui_graphql_client::query_types::{ObjectFilter, ObjectsQuery, ObjectsQueryArgs};
 use sui_graphql_client::Client;
 use sui_sdk_types::Address;
+
+use crate::utils;
 
 pub struct OwnedObjects {
     pub sui_client: Arc<Client>,
@@ -40,61 +39,32 @@ impl OwnedObjects {
     }
 
     pub async fn refresh(&mut self, multisig_id: Address) -> Result<()> {
-        let mut cursor = None;
-        let mut has_next_page = true;
+        let move_values = utils::get_objects(&self.sui_client, multisig_id).await?;
 
-        while has_next_page {
-            let operation = ObjectsQuery::build(ObjectsQueryArgs {
-                after: cursor.as_deref(),
-                before: None,
-                filter: Some(ObjectFilter {
-                    owner: Some(multisig_id),
-                    ..Default::default()
-                }),
-                first: Some(50),
-                last: None,
-            });
+        for move_value in move_values {
+            let fields = move_value
+                .json
+                .and_then(|json| json.as_object().cloned())
+                .ok_or(anyhow!("Could not parse object"))?;
 
-            let response = self.sui_client.run_query(&operation).await?;
-            if let Some(errors) = response.errors {
-                return Err(anyhow!("GraphQL error: {:?}", errors));
-            }
+            let id = fields
+                .get("id")
+                .and_then(|id| id.as_str())
+                .ok_or(anyhow!("Could not get object id"))?
+                .parse::<Address>()?;
 
-            if let Some(objects) = response.data {
-                for object in objects.objects.nodes {
-                    let contents = object
-                        .as_move_object
-                        .and_then(|move_object| move_object.contents)
-                        .ok_or(anyhow!("Could not get object type"))?;
+            let type_ = move_value.type_.repr;
 
-                    let fields = contents
-                        .json
-                        .and_then(|json| json.as_object().cloned())
-                        .ok_or(anyhow!("Could not parse object"))?;
-
-                    let id = fields
-                        .get("id")
-                        .and_then(|id| id.as_str())
-                        .ok_or(anyhow!("Could not get object id"))?
-                        .parse::<Address>()?;
-
-                    let type_ = contents.type_.repr;
-
-                    if type_.starts_with("0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin") {
-                        let balance = fields
-                            .get("balance")
-                            .and_then(|bal| bal.get("value"))
-                            .and_then(|v| v.as_str())
-                            .ok_or(anyhow!("Could not get coin balance"))?
-                            .parse::<u64>()?;
-                        self.coins.push(Coin { type_, id, balance });
-                    } else {
-                        self.objects.push(Object { type_, id, fields });
-                    }
-                }
-
-                cursor = objects.objects.page_info.end_cursor;
-                has_next_page = objects.objects.page_info.has_next_page;
+            if type_.starts_with("0x0000000000000000000000000000000000000000000000000000000000000002::coin::Coin") {
+                let balance = fields
+                    .get("balance")
+                    .and_then(|bal| bal.get("value"))
+                    .and_then(|v| v.as_str())
+                    .ok_or(anyhow!("Could not get coin balance"))?
+                    .parse::<u64>()?;
+                self.coins.push(Coin { type_, id, balance });
+            } else {
+                self.objects.push(Object { type_, id, fields });
             }
         }
 

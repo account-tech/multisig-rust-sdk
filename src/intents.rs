@@ -1,13 +1,14 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Ok, Result};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
-use sui_graphql_client::{Client, Direction, PaginationFilter};
+use sui_graphql_client::Client;
 use sui_sdk_types::{Address, TypeTag};
 
 use crate::actions::{deserialize_actions, IntentActionsType};
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
+use crate::utils;
 
 pub struct Intents {
     pub sui_client: Arc<Client>,
@@ -50,51 +51,35 @@ impl Intents {
     }
 
     pub async fn refresh(&mut self) -> Result<()> {
-        let mut cursor = None;
-        let mut has_next_page = true;
+        let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.bag_id).await?;
 
-        while has_next_page {
-            let filter = PaginationFilter {
-                direction: Direction::Forward,
-                cursor: cursor.clone(),
-                limit: Some(50),
-            };
-
-            let resp = self.sui_client.dynamic_fields(self.bag_id, filter).await?;
-            for df_output in resp.data() {
-                match &df_output.value {
-                    Some(value) => {
-                        let intent: ap::intents::Intent<am::multisig::Approvals> =
-                            bcs::from_bytes(&value.1)?;
-                        self.intents.insert(
-                            intent.key.clone(),
-                            Intent {
-                                sui_client: self.sui_client.clone(),
-                                type_: intent.type_,
-                                key: intent.key,
-                                description: intent.description,
-                                account: intent.account,
-                                creator: intent.creator,
-                                creation_time: intent.creation_time,
-                                execution_times: intent.execution_times,
-                                expiration_time: intent.expiration_time,
-                                role: intent.role,
-                                actions_bag_id: intent.actions.id.into(),
-                                actions_bcs: Vec::new(),
-                                outcome: Approvals {
-                                    total_weight: intent.outcome.total_weight,
-                                    role_weight: intent.outcome.role_weight,
-                                    approved: intent.outcome.approved.contents,
-                                },
-                            },
-                        );
-                    }
-                    None => Err(anyhow!("Intent not found"))?,
-                }
+        for df_output in df_outputs {
+            if let Some(value) = &df_output.value {
+                let intent: ap::intents::Intent<am::multisig::Approvals> =
+                    bcs::from_bytes(&value.1)?;
+                self.intents.insert(
+                    intent.key.clone(),
+                    Intent {
+                        sui_client: self.sui_client.clone(),
+                        type_: intent.type_,
+                        key: intent.key,
+                        description: intent.description,
+                        account: intent.account,
+                        creator: intent.creator,
+                        creation_time: intent.creation_time,
+                        execution_times: intent.execution_times,
+                        expiration_time: intent.expiration_time,
+                        role: intent.role,
+                        actions_bag_id: intent.actions.id.into(),
+                        actions_bcs: Vec::new(),
+                        outcome: Approvals {
+                            total_weight: intent.outcome.total_weight,
+                            role_weight: intent.outcome.role_weight,
+                            approved: intent.outcome.approved.contents,
+                        },
+                    },
+                );
             }
-
-            cursor = resp.page_info().end_cursor.clone();
-            has_next_page = resp.page_info().has_next_page;
         }
 
         Ok(())
@@ -127,43 +112,20 @@ impl fmt::Debug for Intents {
 
 impl Intent {
     pub async fn get_actions_args(&self) -> Result<IntentActionsType> {
-        let actions_bcs = self.fetch_actions_generics_and_bcs_contents().await?;
-        deserialize_actions(&self.type_, &actions_bcs)
-    }
+        let mut df_types_with_bcs = Vec::new();
+        let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.actions_bag_id).await?;
 
-    async fn fetch_actions_generics_and_bcs_contents(
-        &self,
-    ) -> Result<Vec<(Vec<TypeTag>, Vec<u8>)>> {
-        let mut dfs = Vec::<(Vec<TypeTag>, Vec<u8>)>::new();
-        let mut cursor = None;
-        let mut has_next_page = true;
-
-        while has_next_page {
-            let filter = PaginationFilter {
-                direction: Direction::Forward,
-                cursor: cursor.clone(),
-                limit: Some(50),
-            };
-
-            let resp = self
-                .sui_client
-                .dynamic_fields(self.actions_bag_id, filter)
-                .await?;
-            for df_output in resp.data() {
-                if let Some(value) = &df_output.value {
-                    let type_params = match &value.0 {
-                        TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
-                        _ => vec![],
-                    };
-                    dfs.push((type_params, value.1.clone())); // generics + contents bcs
-                }
+        for df_output in df_outputs {
+            if let Some(value) = &df_output.value {
+                let type_params = match &value.0 {
+                    TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
+                    _ => vec![],
+                };
+                df_types_with_bcs.push((type_params, value.1.clone())); // generics + contents bcs
             }
-
-            cursor = resp.page_info().end_cursor.clone();
-            has_next_page = resp.page_info().has_next_page;
         }
 
-        Ok(dfs)
+        deserialize_actions(&self.type_, &df_types_with_bcs)
     }
 }
 
