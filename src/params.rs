@@ -1,8 +1,10 @@
+use anyhow::Result;
 use move_types::functions::Arg;
-use sui_sdk_types::Address;
+use sui_graphql_client::Client;
+use sui_sdk_types::{Address, Argument};
 use sui_transaction_builder::TransactionBuilder;
 
-use crate::utils;
+use crate::{utils, EXTENSIONS_OBJECT};
 
 macro_rules! define_args_struct {
     (
@@ -44,15 +46,38 @@ define_args_struct!(ConfigMultisigArgs {
     role_thresholds: Vec<u64>,
 });
 
-define_args_struct!(ConfigDepsArgs {
-    names: Vec<String>,
-    addresses: Vec<Address>,
-    versions: Vec<u64>,
-});
+pub struct ConfigDepsArgs {
+    pub extensions: Argument,
+    pub names: Arg<Vec<String>>,
+    pub addresses: Arg<Vec<Address>>,
+    pub versions: Arg<Vec<u64>>,
+}
 
-define_args_struct!(BorrowCapArgs {
-    cap_type: String,
-});
+impl ConfigDepsArgs {
+    pub async fn new(
+        sui_client: &Client,
+        builder: &mut TransactionBuilder,
+        names: Vec<String>,
+        addresses: Vec<Address>,
+        versions: Vec<u64>,
+    ) -> Result<Self> {
+        let extensions = utils::object_ref_as_argument(
+            sui_client,
+            builder,
+            Address::from_hex(EXTENSIONS_OBJECT).unwrap(),
+        )
+        .await?;
+
+        Ok(Self {
+            extensions,
+            names: utils::pure_as_argument(builder, &names).into(),
+            addresses: utils::pure_as_argument(builder, &addresses).into(),
+            versions: utils::pure_as_argument(builder, &versions).into(),
+        })
+    }
+}
+
+define_args_struct!(BorrowCapArgs { cap_type: String });
 
 define_args_struct!(DisableRulesArgs {
     coin_type: String,
@@ -139,12 +164,9 @@ define_args_struct!(SpendAndTransfer {
 });
 
 define_args_struct!(SpendAndVest {
-    vault_name: String, 
-    coin_amount: u64, 
-    start_timestamp: u64, 
-    end_timestamp: u64, 
-    recipient: Address, 
+    vault_name: String,
+    coin_amount: u64,
+    start_timestamp: u64,
+    end_timestamp: u64,
+    recipient: Address,
 });
-
-
-

@@ -15,19 +15,32 @@ use sui_sdk_types::{Address, Argument, ObjectData};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 use sui_transaction_builder::{Function, Serialized};
 
-use crate::move_binding::sui;
 use crate::dynamic_fields::DynamicFields;
 use crate::intents::{Intent, Intents};
+use crate::move_binding::sui;
 // use crate::move_binding::account_extensions as ae;
 use crate::move_binding::account_actions as aa;
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::multisig::Multisig;
 use crate::owned_objects::OwnedObjects;
-use crate::params::{ParamsArgs};
+use crate::params::{ConfigDepsArgs, ParamsArgs};
 
 // TODO: MultisigCreateBuilder
-// TODO: params, intents, User
+// TODO: intents, User
+
+static ACCOUNT_PROTOCOL_PACKAGE: &str =
+    "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
+static ACCOUNT_ACTIONS_PACKAGE: &str =
+    "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94";
+static ACCOUNT_MULTISIG_PACKAGE: &str =
+    "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
+static EXTENSIONS_OBJECT: &str =
+    "0x698bc414f25a7036d9a72d6861d9d268e478492dc8bfef8b5c1c2f1eae769254";
+static FEE_OBJECT: &str =
+    "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
+static CLOCK_OBJECT: &str =
+    "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 pub struct MultisigClient {
     sui_client: Arc<Client>,
@@ -35,18 +48,6 @@ pub struct MultisigClient {
 }
 
 impl MultisigClient {
-    pub const ACCOUNT_PROTOCOL_PACKAGE: &str = 
-        "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
-    pub const ACCOUNT_ACTIONS_PACKAGE: &str = 
-        "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94";
-    pub const ACCOUNT_MULTISIG_PACKAGE: &str = 
-        "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
-    pub const EXTENSIONS_OBJECT: &str =
-        "0x698bc414f25a7036d9a72d6861d9d268e478492dc8bfef8b5c1c2f1eae769254";
-    pub const FEE_OBJECT: &str =
-        "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
-    pub const CLOCK_OBJECT: &str =
-        "0x0000000000000000000000000000000000000000000000000000000000000006";
 
     // === Constructors ===
 
@@ -81,10 +82,8 @@ impl MultisigClient {
     // === Multisig ===
 
     pub async fn create_multisig(&self, builder: &mut TransactionBuilder) -> Result<()> {
-        let fee_obj = utils::get_object(
-            &self.sui_client,
-            Address::from_hex(Self::FEE_OBJECT)?,
-        ).await?;
+        let fee_obj =
+            utils::get_object(&self.sui_client, Address::from_hex(FEE_OBJECT)?).await?;
         let fee = if let ObjectData::Struct(obj) = fee_obj.data() {
             bcs::from_bytes::<am::fees::Fees>(obj.contents())
                 .map_err(|e| anyhow!("Failed to parse fee object: {}", e))?
@@ -95,11 +94,7 @@ impl MultisigClient {
         let coin_amount = utils::pure_as_argument(builder, &fee.amount);
         let coin_arg = builder.split_coins(builder.gas(), vec![coin_amount]);
         let fee_arg = builder.input(Input::from(&fee_obj).by_ref());
-        let extensions_arg = utils::object_ref_as_argument(
-            &self.sui_client,
-            builder,
-            Address::from_hex(Self::EXTENSIONS_OBJECT)?,
-        ).await?;
+        let extensions_arg = self.extensions_ref_argument(builder).await?;
 
         let account_obj = am::multisig::new_account(
             builder,
@@ -160,17 +155,13 @@ impl MultisigClient {
         cap_type: &str,
     ) -> Result<()> {
         let multisig_argument = self.multisig_mut_argument(builder).await?;
-        let cap_argument = utils::object_val_as_argument(
-            &self.sui_client,
-            builder,
-            cap_id,
-        ).await?;
+        let cap_argument = utils::object_val_as_argument(&self.sui_client, builder, cap_id).await?;
 
         let auth = am::multisig::authenticate(builder, multisig_argument.into());
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "access_control".parse().unwrap(),
                 "lock_cap".parse().unwrap(),
                 vec![TypeTag::from_str(cap_type)?],
@@ -208,11 +199,7 @@ impl MultisigClient {
         &self,
         builder: &mut TransactionBuilder,
     ) -> Result<()> {
-        let extensions_argument = utils::object_ref_as_argument(
-            &self.sui_client,
-            builder,
-            Address::from_hex(Self::EXTENSIONS_OBJECT)?,
-        ).await?;
+        let extensions_argument = self.extensions_ref_argument(builder).await?;
         let multisig_argument = self.multisig_mut_argument(builder).await?;
         let auth = am::multisig::authenticate(builder, multisig_argument.into());
 
@@ -234,25 +221,26 @@ impl MultisigClient {
         max_supply: Option<u64>,
     ) -> Result<()> {
         let multisig_argument = self.multisig_mut_argument(builder).await?;
-        let cap_argument = utils::object_val_as_argument(
-            &self.sui_client,
-            builder,
-            cap_id,
-        ).await?;
+        let cap_argument = utils::object_val_as_argument(&self.sui_client, builder, cap_id).await?;
         let max_supply_argument = utils::pure_as_argument(builder, &max_supply);
 
         let auth = am::multisig::authenticate(builder, multisig_argument.into());
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "currency".parse().unwrap(),
                 "lock_cap".parse().unwrap(),
                 vec![TypeTag::from_str(coin_type)?],
             ),
-            vec![auth.into(), multisig_argument, cap_argument, max_supply_argument],
+            vec![
+                auth.into(),
+                multisig_argument,
+                cap_argument,
+                max_supply_argument,
+            ],
         );
-        
+
         Ok(())
     }
 
@@ -277,12 +265,17 @@ impl MultisigClient {
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_PROTOCOL_PACKAGE.parse().unwrap(),
+                ACCOUNT_PROTOCOL_PACKAGE.parse().unwrap(),
                 "owned".parse().unwrap(),
                 "merge_and_split".parse().unwrap(),
                 vec![TypeTag::from_str(coin_type)?],
             ),
-            vec![auth.into(), multisig_argument, to_merge_argument, to_split_argument],
+            vec![
+                auth.into(),
+                multisig_argument,
+                to_merge_argument,
+                to_split_argument,
+            ],
         );
 
         Ok(())
@@ -297,11 +290,8 @@ impl MultisigClient {
     ) -> Result<()> {
         let package_name_argument = utils::pure_as_argument(builder, &package_name);
         let timelock_duration_argument = utils::pure_as_argument(builder, &timelock_duration);
-        let upgrade_cap_argument = utils::object_val_as_argument(
-            &self.sui_client,
-            builder,
-            cap_id,
-        ).await?;
+        let upgrade_cap_argument =
+            utils::object_val_as_argument(&self.sui_client, builder, cap_id).await?;
         let multisig_argument = self.multisig_mut_argument(builder).await?;
 
         let auth = am::multisig::authenticate(builder, multisig_argument.into());
@@ -352,14 +342,14 @@ impl MultisigClient {
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "vault".parse().unwrap(),
                 "deposit".parse().unwrap(),
                 vec![TypeTag::from_str(coin_type)?],
             ),
             vec![auth.into(), multisig_argument, vault_name_argument, coin_id],
         );
-        
+
         Ok(())
     }
 
@@ -390,32 +380,26 @@ impl MultisigClient {
         cap_id: Address,
         coin_type: &str,
     ) -> Result<()> {
-        let vesting_argument = utils::object_mut_as_argument(
-            &self.sui_client,
-            builder,
-            vesting_id,
-        ).await?;
-        let cap_argument = utils::object_ref_as_argument(
-            &self.sui_client,
-            builder,
-            cap_id,
-        ).await?;
+        let vesting_argument =
+            utils::object_mut_as_argument(&self.sui_client, builder, vesting_id).await?;
+        let cap_argument = utils::object_ref_as_argument(&self.sui_client, builder, cap_id).await?;
         let clock_argument = utils::object_ref_as_argument(
             &self.sui_client,
             builder,
-            Address::from_hex(Self::CLOCK_OBJECT)?,
-        ).await?;
+            Address::from_hex(CLOCK_OBJECT)?,
+        )
+        .await?;
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "vesting".parse().unwrap(),
                 "claim".parse().unwrap(),
                 vec![TypeTag::from_str(coin_type)?],
             ),
             vec![vesting_argument, cap_argument, clock_argument],
         );
-        
+
         Ok(())
     }
 
@@ -425,32 +409,33 @@ impl MultisigClient {
         vesting_id: Address,
         coin_type: &str,
     ) -> Result<()> {
-        let vesting_argument = utils::object_mut_as_argument(
-            &self.sui_client,
-            builder,
-            vesting_id,
-        ).await?;
-        let multisig_argument = utils::object_ref_as_argument(
-            &self.sui_client,
-            builder,
-            self.multisig_id()?,
-        ).await?;
+        let vesting_argument =
+            utils::object_mut_as_argument(&self.sui_client, builder, vesting_id).await?;
+        let multisig_argument =
+            utils::object_ref_as_argument(&self.sui_client, builder, self.multisig_id()?).await?;
 
         let auth = am::multisig::authenticate(builder, multisig_argument.into());
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "vesting".parse().unwrap(),
                 "cancel_payment".parse().unwrap(),
                 vec![
-                    format!("{}::{}::{}", Self::ACCOUNT_MULTISIG_PACKAGE, "multisig", "Multisig").parse().unwrap(),
-                    TypeTag::from_str(coin_type)?
+                    format!(
+                        "{}::{}::{}",
+                        ACCOUNT_MULTISIG_PACKAGE,
+                        "multisig",
+                        "Multisig"
+                    )
+                    .parse()
+                    .unwrap(),
+                    TypeTag::from_str(coin_type)?,
                 ],
             ),
             vec![auth.into(), vesting_argument, multisig_argument],
         );
-        
+
         Ok(())
     }
 
@@ -460,22 +445,19 @@ impl MultisigClient {
         vesting_id: Address,
         coin_type: &str,
     ) -> Result<()> {
-        let vesting_argument = utils::object_val_as_argument(
-            &self.sui_client,
-            builder,
-            vesting_id,
-        ).await?;
+        let vesting_argument =
+            utils::object_val_as_argument(&self.sui_client, builder, vesting_id).await?;
 
         builder.move_call(
             Function::new(
-                Self::ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
                 "vesting".parse().unwrap(),
                 "destroy_empty".parse().unwrap(),
                 vec![TypeTag::from_str(coin_type)?],
             ),
             vec![vesting_argument],
         );
-        
+
         Ok(())
     }
 
@@ -484,14 +466,10 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         cap_id: Address,
     ) -> Result<()> {
-        let cap_argument = utils::object_val_as_argument(
-            &self.sui_client,
-            builder,
-            cap_id,
-        ).await?;
+        let cap_argument = utils::object_val_as_argument(&self.sui_client, builder, cap_id).await?;
 
         aa::vesting::destroy_cap(builder, cap_argument.into());
-        
+
         Ok(())
     }
 
@@ -521,29 +499,28 @@ impl MultisigClient {
         |builder, expired| am::config::delete_config_multisig(builder, expired),
     );
 
-    // define_intent_interface!(
-    //     config_multisig,
-    //     ConfigMultisigArgs,
-    //     |builder, auth, multisig_input, params, outcome, args: ConfigMultisigArgs| {
-    //         ap::config::req(
-    //             builder,
-    //             auth,
-    //             multisig_input,
-    //             params,
-    //             outcome,
-    //             args.addresses,
-    //             args.weights,
-    //             args.roles,
-    //             args.global,
-    //             args.role_names,
-    //             args.role_thresholds,
-    //         )
-    //     },
-    //     |builder, executable, multisig| am::config::execute_config_multisig(
-    //         builder, executable, multisig
-    //     ),
-    //     |builder, expired| am::config::delete_config_multisig(builder, expired),
-    // );
+    define_intent_interface!(
+        config_deps,
+        params::ConfigDepsArgs,
+        |builder, auth, multisig_input, params, outcome, args: ConfigDepsArgs| {
+            ap::config::request_config_deps::<am::multisig::Multisig, am::multisig::Approvals>(
+                builder,
+                auth,
+                multisig_input,
+                params,
+                outcome,
+                args.extensions.into(),
+                args.names,
+                args.addresses,
+                args.versions,
+            )
+        },
+        |builder, executable, multisig| ap::config::execute_config_deps::<
+            am::multisig::Multisig,
+            am::multisig::Approvals,
+        >(builder, executable, multisig),
+        |builder, expired| ap::config::delete_config_deps(builder, expired),
+    );
 
     // === Getters ===
 
@@ -560,7 +537,10 @@ impl MultisigClient {
     }
 
     pub fn multisig_id(&self) -> Result<Address> {
-        self.multisig.as_ref().map(|m| m.id).ok_or(anyhow!("Multisig not loaded"))
+        self.multisig
+            .as_ref()
+            .map(|m| m.id)
+            .ok_or(anyhow!("Multisig not loaded"))
     }
 
     pub fn intents(&self) -> Option<&Intents> {
@@ -582,11 +562,16 @@ impl MultisigClient {
     // === Helpers ===
 
     async fn multisig_mut_argument(&self, builder: &mut TransactionBuilder) -> Result<Argument> {
-        utils::object_mut_as_argument(
+        utils::object_mut_as_argument(&self.sui_client, builder, self.multisig_id()?).await
+    }
+
+    async fn extensions_ref_argument(&self, builder: &mut TransactionBuilder) -> Result<Argument> {
+        utils::object_ref_as_argument(
             &self.sui_client,
             builder,
-            self.multisig_id()?,
-        ).await
+            Address::from_hex(EXTENSIONS_OBJECT)?,
+        )
+        .await
     }
 }
 
@@ -610,7 +595,7 @@ macro_rules! define_intent_interface {
                 let clock_argument = utils::object_ref_as_argument(
                     &self.sui_client,
                     builder,
-                    Address::from_hex(Self::CLOCK_OBJECT)?,
+                    Address::from_hex(CLOCK_OBJECT)?,
                 ).await?;
 
                 let auth = am::multisig::authenticate(builder, multisig_argument.into());
@@ -638,7 +623,7 @@ macro_rules! define_intent_interface {
                 let clock_argument = utils::object_ref_as_argument(
                     &self.sui_client,
                     builder,
-                    Address::from_hex(Self::CLOCK_OBJECT)?,
+                    Address::from_hex(CLOCK_OBJECT)?,
                 ).await?;
                 let key_argument = utils::pure_as_argument(builder, &intent_key);
 
@@ -678,7 +663,7 @@ macro_rules! define_intent_interface {
                 let clock_argument = utils::object_ref_as_argument(
                     &self.sui_client,
                     builder,
-                    Address::from_hex(Self::CLOCK_OBJECT)?,
+                    Address::from_hex(CLOCK_OBJECT)?,
                 ).await?;
                 let key_argument = utils::pure_as_argument(builder, &intent_key);
 

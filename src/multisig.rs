@@ -12,6 +12,7 @@ use crate::intents::Intents;
 use crate::owned_objects::OwnedObjects;
 use crate::dynamic_fields::DynamicFields;
 use crate::utils;
+use crate::FEE_OBJECT;
 
 pub struct Multisig {
     pub sui_client: Arc<Client>,
@@ -63,8 +64,6 @@ pub struct Role {
 }
 
 impl Multisig {
-    pub const FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
-
     pub async fn from_id(sui_client: Arc<Client>, id: Address) -> Result<Self> {
         let mut multisig = Self {
             sui_client: sui_client.clone(),
@@ -173,7 +172,7 @@ impl Multisig {
         // --- Fees ---
 
         // fetch the Fees object
-        let fee_obj = utils::get_object(&self.sui_client, Address::from_hex(Self::FEE_OBJECT).unwrap()).await?;
+        let fee_obj = utils::get_object(&self.sui_client, Address::from_hex(FEE_OBJECT).unwrap()).await?;
 
         // parse the Fees object
         if let ObjectData::Struct(obj) = fee_obj.data() {
