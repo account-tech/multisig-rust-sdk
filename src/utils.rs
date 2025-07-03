@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use cynic::QueryBuilder;
-use sui_sdk_types::{Address, Argument, Object};
+use sui_sdk_types::{Address, Argument, Object, Owner};
 use sui_graphql_client::{query_types::{MoveValue, ObjectFilter, ObjectsQuery, ObjectsQueryArgs}, Client, Direction, DynamicFieldOutput, PaginationFilter};
 use sui_transaction_builder::{TransactionBuilder, Serialized, unresolved::Input};
 
@@ -9,6 +9,19 @@ pub async fn get_object(sui_client: &Client, id: Address) -> Result<Object> {
         .object(id, None)
         .await?
         .ok_or(anyhow!("Object not found {}", id))
+}
+
+pub async fn get_object_as_input_owned(sui_client: &Client, id: Address) -> Result<Input> {
+    let object = get_object(sui_client, id).await?;
+    let mut input = Input::from(&object);
+    
+    input = match object.owner() {
+        Owner::Address(_) => input.with_owned_kind(),
+        Owner::Object(_) => input.with_owned_kind(),
+        _ => input,
+    };
+
+    Ok(input)
 }
 
 // gets `MoveValue`s from sui-graphql-client (to get the fields json)
@@ -104,13 +117,23 @@ pub async fn object_mut_as_argument(
     Ok(argument)
 }
 
+#[macro_export]
+macro_rules! build_arg {
+    ($sui_client:expr, $builder:expr, $id:expr, $build_input:expr) => {{
+        let object = utils::get_object($sui_client, $id).await?;
+        let input = Input::from(&object);
+        let argument = $builder.input($build_input(input));
+        Ok(argument)
+    }};
+}
+
 pub async fn object_val_as_argument(
     sui_client: &Client,
     builder: &mut TransactionBuilder,
     id: Address
 ) -> Result<Argument> {
     let object = get_object(sui_client, id).await?;
-    let argument = builder.input(Input::from(&object).by_val());
+    let argument = builder.input(Input::from(&object).by_val().with_owned_kind());
     
     Ok(argument)
 }

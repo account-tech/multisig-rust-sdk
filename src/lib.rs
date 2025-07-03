@@ -8,7 +8,7 @@ pub mod params;
 pub mod utils;
 
 use anyhow::{anyhow, Ok, Result};
-use move_types::TypeTag;
+use move_types::{Identifier, Key, MoveStruct, MoveType, StructTag, TypeTag};
 use std::{str::FromStr, sync::Arc};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, Argument, ObjectData};
@@ -24,7 +24,7 @@ use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::multisig::Multisig;
 use crate::owned_objects::OwnedObjects;
-use crate::params::{ConfigDepsArgs, ParamsArgs};
+use crate::params::ParamsArgs;
 
 // TODO: MultisigCreateBuilder
 // TODO: intents, User
@@ -37,10 +37,8 @@ static ACCOUNT_MULTISIG_PACKAGE: &str =
     "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
 static EXTENSIONS_OBJECT: &str =
     "0x698bc414f25a7036d9a72d6861d9d268e478492dc8bfef8b5c1c2f1eae769254";
-static FEE_OBJECT: &str =
-    "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
-static CLOCK_OBJECT: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000006";
+static FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
+static CLOCK_OBJECT: &str = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 pub struct MultisigClient {
     sui_client: Arc<Client>,
@@ -48,7 +46,6 @@ pub struct MultisigClient {
 }
 
 impl MultisigClient {
-
     // === Constructors ===
 
     pub fn new_with_client(sui_client: Client) -> Self {
@@ -82,8 +79,7 @@ impl MultisigClient {
     // === Multisig ===
 
     pub async fn create_multisig(&self, builder: &mut TransactionBuilder) -> Result<()> {
-        let fee_obj =
-            utils::get_object(&self.sui_client, Address::from_hex(FEE_OBJECT)?).await?;
+        let fee_obj = utils::get_object(&self.sui_client, Address::from_hex(FEE_OBJECT)?).await?;
         let fee = if let ObjectData::Struct(obj) = fee_obj.data() {
             bcs::from_bytes::<am::fees::Fees>(obj.contents())
                 .map_err(|e| anyhow!("Failed to parse fee object: {}", e))?
@@ -125,10 +121,10 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         intent_key: String,
     ) -> Result<()> {
-        let multisig_argument = self.multisig_mut_argument(builder).await?;
-        let key_argument = utils::pure_as_argument(builder, &intent_key);
+        let multisig_arg = self.multisig_mut_argument(builder).await?;
+        let key_arg = utils::pure_as_argument(builder, &intent_key);
 
-        am::multisig::approve_intent(builder, multisig_argument.into(), key_argument.into());
+        am::multisig::approve_intent(builder, multisig_arg.into(), key_arg.into());
 
         Ok(())
     }
@@ -138,35 +134,30 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         intent_key: String,
     ) -> Result<()> {
-        let multisig_argument = self.multisig_mut_argument(builder).await?;
-        let key_argument = utils::pure_as_argument(builder, &intent_key);
+        let multisig_arg = self.multisig_mut_argument(builder).await?;
+        let key_arg = utils::pure_as_argument(builder, &intent_key);
 
-        am::multisig::disapprove_intent(builder, multisig_argument.into(), key_argument.into());
+        am::multisig::disapprove_intent(builder, multisig_arg.into(), key_arg.into());
 
         Ok(())
     }
 
     // === Commands ===
 
-    pub async fn deposit_cap(
+    pub async fn deposit_cap<CapType: Key>(
         &self,
         builder: &mut TransactionBuilder,
-        cap_id: Address,
-        cap_type: &str,
+        cap: CapType,
     ) -> Result<()> {
-        let multisig_argument = self.multisig_mut_argument(builder).await?;
-        let cap_argument = utils::object_val_as_argument(&self.sui_client, builder, cap_id).await?;
+        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
+        let cap_arg = builder.input(self.obj(*cap.id().as_address()).await?);
 
-        let auth = am::multisig::authenticate(builder, multisig_argument.into());
-
-        builder.move_call(
-            Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control".parse().unwrap(),
-                "lock_cap".parse().unwrap(),
-                vec![TypeTag::from_str(cap_type)?],
-            ),
-            vec![auth.into(), multisig_argument, cap_argument],
+        let auth = am::multisig::authenticate(builder, ms_arg.into());
+        aa::access_control::lock_cap::<am::multisig::Multisig, CapType>(
+            builder,
+            auth,
+            ms_arg.into(),
+            cap_arg.into(),
         );
 
         Ok(())
@@ -424,9 +415,7 @@ impl MultisigClient {
                 vec![
                     format!(
                         "{}::{}::{}",
-                        ACCOUNT_MULTISIG_PACKAGE,
-                        "multisig",
-                        "Multisig"
+                        ACCOUNT_MULTISIG_PACKAGE, "multisig", "Multisig"
                     )
                     .parse()
                     .unwrap(),
@@ -502,7 +491,7 @@ impl MultisigClient {
     define_intent_interface!(
         config_deps,
         params::ConfigDepsArgs,
-        |builder, auth, multisig_input, params, outcome, args: ConfigDepsArgs| {
+        |builder, auth, multisig_input, params, outcome, args: params::ConfigDepsArgs| {
             ap::config::request_config_deps::<am::multisig::Multisig, am::multisig::Approvals>(
                 builder,
                 auth,
@@ -520,6 +509,70 @@ impl MultisigClient {
             am::multisig::Approvals,
         >(builder, executable, multisig),
         |builder, expired| ap::config::delete_config_deps(builder, expired),
+    );
+
+    define_intent_interface!(
+        toggle_unverified_allowed,
+        (),
+        |builder, auth, multisig_input, params, outcome, _args: ()| {
+            ap::config::request_toggle_unverified_allowed::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, auth, multisig_input, params, outcome)
+        },
+        |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
+            am::multisig::Multisig,
+            am::multisig::Approvals,
+        >(builder, executable, multisig),
+        |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
+    );
+
+    define_intent_interface!(
+        borrow_cap,
+        CoinType,
+        (),
+        |builder, auth, multisig_input, params, outcome, _args: ()| {
+            aa::access_control_intents::request_borrow_cap::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+                CoinType,
+            >(builder, auth, multisig_input, params, outcome)
+        },
+        |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
+            am::multisig::Multisig,
+            am::multisig::Approvals,
+        >(builder, executable, multisig),
+        |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
+    );
+
+    define_intent_interface!(
+        disable_rules,
+        CoinType,
+        params::DisableRulesArgs,
+        |builder, auth, multisig_input, params, outcome, args: params::DisableRulesArgs| {
+            aa::currency_intents::request_disable_rules::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+                CoinType,
+            >(
+                builder,
+                auth,
+                multisig_input,
+                params,
+                outcome,
+                args.mint,
+                args.burn,
+                args.update_symbol,
+                args.update_name,
+                args.update_description,
+                args.update_icon,
+            )
+        },
+        |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
+            am::multisig::Multisig,
+            am::multisig::Approvals,
+        >(builder, executable, multisig),
+        |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
     );
 
     // === Getters ===
@@ -573,6 +626,74 @@ impl MultisigClient {
         )
         .await
     }
+
+    async fn obj(&self, id: Address) -> Result<Input> {
+        utils::get_object_as_input_owned(&self.sui_client, id).await
+    }
+}
+
+#[macro_export]
+macro_rules! generic_type {
+    ($full_path:expr) => {{
+        use move_types::{MoveType, StructTag, TypeTag};
+
+        #[derive(serde::Serialize, serde::Deserialize)]
+        pub struct Generic {}
+
+        impl MoveType for Generic {
+            fn type_() -> TypeTag {
+                let parts: Vec<&str> = $full_path.split("::").collect();
+                if parts.len() != 3 {
+                    panic!(
+                        "Invalid coin type path: {}. Expected format: address::module::name",
+                        $full_path
+                    );
+                }
+
+                let address = parts[0];
+                let module = parts[1];
+                let name = parts[2];
+
+                TypeTag::Struct(Box::new(StructTag {
+                    address: address.parse().unwrap(),
+                    module: module.parse().unwrap(),
+                    name: name.parse().unwrap(),
+                    type_params: vec![],
+                }))
+            }
+        }
+
+        Generic {}
+    }};
+}
+
+#[macro_export]
+macro_rules! move_obj {
+    ($id:expr, $full_path:expr) => {{
+        use move_types::{Key, MoveStruct, MoveType, ObjectId, StructTag, TypeTag};
+        use std::str::FromStr;
+
+        #[derive(serde::Serialize, serde::Deserialize)]
+        pub struct Object {
+            pub id: ObjectId,
+        }
+
+        impl MoveStruct for Object {
+            fn struct_type() -> StructTag {
+                StructTag::from_str($full_path).unwrap()
+            }
+        }
+
+        impl Key for Object {
+            fn id(&self) -> &ObjectId {
+                &self.id
+            }
+        }
+
+        Object {
+            id: $id.parse().unwrap(),
+        }
+    }};
 }
 
 #[macro_export]
@@ -655,6 +776,110 @@ macro_rules! define_intent_interface {
             }
 
             pub async fn [<delete_ $intent_name>](
+                &self,
+                builder: &mut TransactionBuilder,
+                intent_key: String,
+            ) -> Result<()> {
+                let multisig_argument = self.multisig_mut_argument(builder).await?;
+                let clock_argument = utils::object_ref_as_argument(
+                    &self.sui_client,
+                    builder,
+                    Address::from_hex(CLOCK_OBJECT)?,
+                ).await?;
+                let key_argument = utils::pure_as_argument(builder, &intent_key);
+
+                let mut expired = ap::account::delete_expired_intent::<
+                    am::multisig::Multisig,
+                    am::multisig::Approvals,
+                >(builder, multisig_argument.into(), key_argument.into(), clock_argument.into());
+
+                $delete_calls(builder, expired.borrow_mut());
+                ap::intents::destroy_empty_expired(builder, expired);
+                Ok(())
+            }
+        }
+    };
+
+    (
+        $intent_name:ident,
+        $generic_type:ident,
+        $request_args_type:ty,
+        $request_call:expr,
+        $execute_call:expr,
+        $delete_calls:expr,
+    ) => {
+        paste::paste! {
+            pub async fn [<request_ $intent_name>]<$generic_type: MoveType>(
+                &self,
+                builder: &mut TransactionBuilder,
+                params_args: ParamsArgs,
+                request_args: $request_args_type,
+                _generic_type: $generic_type,
+            ) -> Result<()> {
+                let multisig_argument = self.multisig_mut_argument(builder).await?;
+                let clock_argument = utils::object_ref_as_argument(
+                    &self.sui_client,
+                    builder,
+                    Address::from_hex(CLOCK_OBJECT)?,
+                ).await?;
+
+                let auth = am::multisig::authenticate(builder, multisig_argument.into());
+                let params = ap::intents::new_params(
+                    builder,
+                    params_args.key,
+                    params_args.description,
+                    params_args.execution_times,
+                    params_args.expiration_time,
+                    clock_argument.into(),
+                );
+                let outcome = am::multisig::empty_outcome(builder);
+
+                $request_call(builder, auth, multisig_argument.into(), params, outcome, request_args);
+                Ok(())
+            }
+
+            pub async fn [<execute_ $intent_name>]<$generic_type: MoveType>(
+                &self,
+                builder: &mut TransactionBuilder,
+                intent_key: String,
+                clear: bool,
+            ) -> Result<()> {
+                let multisig_argument = self.multisig_mut_argument(builder).await?;
+                let clock_argument = utils::object_ref_as_argument(
+                    &self.sui_client,
+                    builder,
+                    Address::from_hex(CLOCK_OBJECT)?,
+                ).await?;
+                let key_argument = utils::pure_as_argument(builder, &intent_key);
+
+                let mut executable = am::multisig::execute_intent(
+                    builder,
+                    multisig_argument.into(),
+                    key_argument.into(),
+                    clock_argument.into(),
+                );
+
+                $execute_call(builder, executable.borrow_mut(), multisig_argument.into());
+
+                ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
+                    builder,
+                    multisig_argument.into(),
+                    executable,
+                );
+
+                if clear {
+                    let mut expired = ap::account::destroy_empty_intent::<
+                        am::multisig::Multisig,
+                        am::multisig::Approvals,
+                    >(builder, multisig_argument.into(), key_argument.into());
+
+                    $delete_calls(builder, expired.borrow_mut());
+                    ap::intents::destroy_empty_expired(builder, expired);
+                }
+                Ok(())
+            }
+
+            pub async fn [<delete_ $intent_name>]<$generic_type: MoveType>(
                 &self,
                 builder: &mut TransactionBuilder,
                 intent_key: String,

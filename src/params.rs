@@ -1,5 +1,6 @@
+use std::str::FromStr;
 use anyhow::Result;
-use move_types::functions::Arg;
+use move_types::{functions::Arg, TypeTag, Identifier, StructTag, MoveType};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, Argument};
 use sui_transaction_builder::TransactionBuilder;
@@ -77,10 +78,7 @@ impl ConfigDepsArgs {
     }
 }
 
-define_args_struct!(BorrowCapArgs { cap_type: String });
-
 define_args_struct!(DisableRulesArgs {
-    coin_type: String,
     mint: bool,
     burn: bool,
     update_symbol: bool,
