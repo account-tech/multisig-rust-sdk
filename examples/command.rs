@@ -5,7 +5,7 @@ use sui_sdk_types::{Address, ExecutionStatus};
 use sui_crypto::{ed25519::Ed25519PrivateKey, SuiSigner};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
-use account_multisig_sdk::{MultisigClient, move_obj};
+use account_multisig_sdk::{MultisigClient, move_object};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     client.load_multisig(Address::from_hex("0xbd4128161c82c7b58e320c2cf7ed10a0bffc3de1859593879c15875800bda672").unwrap()).await?;
     let mut builder = init_tx(client.sui()).await;
     
-    let cap = move_obj!(
+    let cap = move_object!(
         "0x0e6fe974634e3a96e9ddb10e533255b4556b8e111ecce95c774f65cda919b4a9",
         "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap"
     );

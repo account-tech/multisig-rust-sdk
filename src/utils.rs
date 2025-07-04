@@ -88,52 +88,52 @@ pub async fn get_dynamic_fields(sui_client: &Client, id: Address) -> Result<Vec<
     Ok(df_outputs)
 }
 
-pub fn pure_as_argument<T: serde::Serialize + move_types::MoveType>(
-    builder: &mut TransactionBuilder,
-    pure_value: &T
-) -> Argument {
-    builder.input(Serialized(pure_value))
-}
+// pub fn pure_as_argument<T: serde::Serialize + move_types::MoveType>(
+//     builder: &mut TransactionBuilder,
+//     pure_value: &T
+// ) -> Argument {
+//     builder.input(Serialized(pure_value))
+// }
 
-pub async fn object_ref_as_argument(
-    sui_client: &Client,
-    builder: &mut TransactionBuilder,
-    id: Address
-) -> Result<Argument> {
-    let object = get_object(sui_client, id).await?;
-    let argument = builder.input(Input::from(&object).by_ref());
+// pub async fn object_ref_as_argument(
+//     sui_client: &Client,
+//     builder: &mut TransactionBuilder,
+//     id: Address
+// ) -> Result<Argument> {
+//     let object = get_object(sui_client, id).await?;
+//     let argument = builder.input(Input::from(&object).by_ref());
     
-    Ok(argument)
-}
+//     Ok(argument)
+// }
 
-pub async fn object_mut_as_argument(
-    sui_client: &Client,
-    builder: &mut TransactionBuilder,
-    id: Address
-) -> Result<Argument> {
-    let object = get_object(sui_client, id).await?;
-    let argument = builder.input(Input::from(&object).by_mut());
+// pub async fn object_mut_as_argument(
+//     sui_client: &Client,
+//     builder: &mut TransactionBuilder,
+//     id: Address
+// ) -> Result<Argument> {
+//     let object = get_object(sui_client, id).await?;
+//     let argument = builder.input(Input::from(&object).by_mut());
     
-    Ok(argument)
-}
+//     Ok(argument)
+// }
 
-#[macro_export]
-macro_rules! build_arg {
-    ($sui_client:expr, $builder:expr, $id:expr, $build_input:expr) => {{
-        let object = utils::get_object($sui_client, $id).await?;
-        let input = Input::from(&object);
-        let argument = $builder.input($build_input(input));
-        Ok(argument)
-    }};
-}
+// #[macro_export]
+// macro_rules! build_arg {
+//     ($sui_client:expr, $builder:expr, $id:expr, $build_input:expr) => {{
+//         let object = utils::get_object($sui_client, $id).await?;
+//         let input = Input::from(&object);
+//         let argument = $builder.input($build_input(input));
+//         Ok(argument)
+//     }};
+// }
 
-pub async fn object_val_as_argument(
-    sui_client: &Client,
-    builder: &mut TransactionBuilder,
-    id: Address
-) -> Result<Argument> {
-    let object = get_object(sui_client, id).await?;
-    let argument = builder.input(Input::from(&object).by_val().with_owned_kind());
+// pub async fn object_val_as_argument(
+//     sui_client: &Client,
+//     builder: &mut TransactionBuilder,
+//     id: Address
+// ) -> Result<Argument> {
+//     let object = get_object(sui_client, id).await?;
+//     let argument = builder.input(Input::from(&object).by_val().with_owned_kind());
     
-    Ok(argument)
-}
+//     Ok(argument)
+// }

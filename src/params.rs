@@ -1,11 +1,13 @@
-use std::str::FromStr;
 use anyhow::Result;
-use move_types::{functions::Arg, TypeTag, Identifier, StructTag, MoveType};
+use move_types::{functions::Arg, ObjectId};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, Argument};
-use sui_transaction_builder::TransactionBuilder;
+use sui_transaction_builder::{TransactionBuilder, Serialized};
 
-use crate::{utils, EXTENSIONS_OBJECT};
+use crate::{
+    utils::get_object_as_input_owned as get_input,
+    EXTENSIONS_OBJECT,
+};
 
 macro_rules! define_args_struct {
     (
@@ -24,7 +26,7 @@ macro_rules! define_args_struct {
                 $($field_name: $field_type,)*
             ) -> Self {
                 Self {
-                    $($field_name: utils::pure_as_argument(builder, &$field_name).into(),)*
+                    $($field_name: builder.input(Serialized(&$field_name)).into(),)*
                 }
             }
         }
@@ -62,18 +64,14 @@ impl ConfigDepsArgs {
         addresses: Vec<Address>,
         versions: Vec<u64>,
     ) -> Result<Self> {
-        let extensions = utils::object_ref_as_argument(
-            sui_client,
-            builder,
-            Address::from_hex(EXTENSIONS_OBJECT).unwrap(),
-        )
-        .await?;
+        let extensions_input = get_input(sui_client, EXTENSIONS_OBJECT.parse().unwrap()).await?;
+        let extensions_argument = builder.input(extensions_input.by_ref());
 
         Ok(Self {
-            extensions,
-            names: utils::pure_as_argument(builder, &names).into(),
-            addresses: utils::pure_as_argument(builder, &addresses).into(),
-            versions: utils::pure_as_argument(builder, &versions).into(),
+            extensions: extensions_argument,
+            names: builder.input(Serialized(&names)).into(),
+            addresses: builder.input(Serialized(&addresses)).into(),
+            versions: builder.input(Serialized(&versions)).into(),
         })
     }
 }
@@ -88,21 +86,18 @@ define_args_struct!(DisableRulesArgs {
 });
 
 define_args_struct!(UpdateMetadataArgs {
-    coin_type: String,
-    symbol: String,
-    name: String,
-    description: String,
-    icon_url: String,
+    symbol: Option<String>,
+    name: Option<String>,
+    description: Option<String>,
+    icon_url: Option<String>,
 });
 
 define_args_struct!(MintAndTransferArgs {
-    coin_type: String,
     amounts: Vec<u64>,
     recipients: Vec<Address>,
 });
 
 define_args_struct!(MintAndVestArgs {
-    coin_type: String,
     total_amount: u64,
     start_timestamp: u64,
     end_timestamp: u64,
@@ -110,8 +105,7 @@ define_args_struct!(MintAndVestArgs {
 });
 
 define_args_struct!(WithdrawAndBurnArgs {
-    coin_type: String,
-    coin_id: Address,
+    coin_id: ObjectId,
     amount: u64,
 });
 
@@ -128,7 +122,7 @@ define_args_struct!(ListNftsArgs {
 });
 
 define_args_struct!(WithdrawAndTransferToVaultArgs {
-    coin_id: Address,
+    coin_id: ObjectId,
     coin_amount: u64,
     vault_name: String,
 });
