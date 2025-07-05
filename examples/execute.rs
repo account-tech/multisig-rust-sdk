@@ -6,7 +6,7 @@ use sui_sdk_types::{Address, ExecutionStatus};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
 use account_multisig_sdk::{
-    move_type,
+    define_move_object,
     params::{ConfigMultisigArgs, ParamsArgs},
     MultisigClient,
 };
@@ -20,20 +20,26 @@ async fn main() -> Result<()> {
     ).await?;
     let mut builder = init_tx(client.sui()).await;
 
-    let (executable, cap) = client.execute_borrow_cap_proper(
-        &mut builder,
-        "borrow_cap_again".to_string(),
+    define_move_object!(
+        AdminCap,
+        "",
         "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+    );
+    let (executable, cap) = client.execute_borrow_cap::<AdminCap>(
+        &mut builder,
+        "borrow_cap_again",
     ).await?;
 
     client.execute_return_cap(
         &mut builder,
-        "borrow_cap_again".to_string(),
         executable,
         cap,
-        "0xd06dfba27a48b7b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+    ).await?;
+
+    client.delete_borrow_cap::<AdminCap>(
+        &mut builder, 
+        "borrow_cap_again",
         1,
-        true,
     ).await?;
 
     execute_tx(client.sui(), builder).await;

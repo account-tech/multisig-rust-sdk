@@ -6,7 +6,7 @@ use sui_sdk_types::{Address, ExecutionStatus};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
 use account_multisig_sdk::{
-    move_type,
+    define_move_type,
     params::{ConfigMultisigArgs, ParamsArgs},
     MultisigClient,
 };
@@ -40,12 +40,15 @@ async fn main() -> Result<()> {
     // );
     // client.request_config_multisig(&mut builder, params, args).await?;
 
+    define_move_type!(
+        AdminCap,
+        "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+    );
     client
-        .request_borrow_cap(
+        .request_borrow_cap::<AdminCap>(
             &mut builder,
             params,
             (),
-            vec!["0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap"],
         )
         .await?;
 

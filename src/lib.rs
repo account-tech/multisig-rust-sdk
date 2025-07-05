@@ -468,7 +468,7 @@ impl MultisigClient {
     //     CapObject:Key,
     // );
 
-    pub async fn execute_borrow_cap<Cap: MoveType + Key>(
+    pub async fn execute_borrow_cap<Cap: Key>(
         &self,
         builder: &mut TransactionBuilder,
         key: &str,
@@ -494,7 +494,7 @@ impl MultisigClient {
 
     // Use the Cap between borrow and return
 
-    pub async fn execute_return_cap<Cap: MoveType + Key>(
+    pub async fn execute_return_cap<Cap: Key>(
         &self,
         builder: &mut TransactionBuilder,
         mut executable: Arg<ap::executable::Executable<am::multisig::Approvals>>,
@@ -516,6 +516,15 @@ impl MultisigClient {
 
         Ok(())
     }
+
+    define_delete_intent!(
+        delete_borrow_cap,
+        |builder: &mut TransactionBuilder, expired: Argument| {
+            aa::access_control::delete_borrow::<CapType>(builder, expired.into());
+            aa::access_control::delete_return::<CapType>(builder, expired.into());
+        },
+        CapType,
+    );
 
     // define_intent_interface!(
     //     disable_rules,
@@ -926,13 +935,16 @@ impl MultisigClient {
 
 #[macro_export]
 macro_rules! define_move_type {
-    ($full_path:expr) => {
+    (
+        $move_type:ident,
+        $full_path:expr $(,)?
+    ) => {
         use move_types::{MoveType, StructTag, TypeTag};
 
         #[derive(serde::Serialize, serde::Deserialize)]
-        pub struct Generic {}
+        pub struct $move_type {}
 
-        impl MoveType for Generic {
+        impl MoveType for $move_type {
             fn type_() -> TypeTag {
                 let parts: Vec<&str> = $full_path.split("::").collect();
                 if parts.len() != 3 {
@@ -959,21 +971,25 @@ macro_rules! define_move_type {
 
 #[macro_export]
 macro_rules! define_move_object {
-    ($id:expr, $full_path:expr) => {
+    (
+        $move_object_name:ident, 
+        $id:expr, 
+        $full_path:expr $(,)?
+    ) => {
         use move_types::{Key, MoveStruct, MoveType, ObjectId, StructTag, TypeTag};
 
         #[derive(serde::Serialize, serde::Deserialize)]
-        pub struct Object {
+        pub struct $move_object_name {
             pub id: ObjectId,
         }
 
-        impl MoveStruct for Object {
+        impl MoveStruct for $move_object_name {
             fn struct_type() -> StructTag {
                 $full_path.parse().unwrap()
             }
         }
 
-        impl Key for Object {
+        impl Key for $move_object_name {
             fn id(&self) -> &ObjectId {
                 &self.id
             }
@@ -1083,7 +1099,7 @@ macro_rules! define_delete_intent {
             >(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow());
 
             for _ in 0..repeat {
-                $delete_calls(builder, expired.borrow_mut());
+                $delete_calls(builder, expired.borrow_mut().into());
             }
             ap::intents::destroy_empty_expired(builder, expired);
             Ok(())
