@@ -2,12 +2,9 @@ use anyhow::Result;
 use move_types::{functions::Arg, ObjectId};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, Argument};
-use sui_transaction_builder::{TransactionBuilder, Serialized};
+use sui_transaction_builder::{Serialized, TransactionBuilder};
 
-use crate::{
-    utils::get_object_as_input_owned as get_input,
-    EXTENSIONS_OBJECT,
-};
+use crate::{utils::get_object_as_input, EXTENSIONS_OBJECT};
 
 macro_rules! define_args_struct {
     (
@@ -26,6 +23,32 @@ macro_rules! define_args_struct {
                 $($field_name: $field_type,)*
             ) -> Self {
                 Self {
+                    $($field_name: builder.input(Serialized(&$field_name)).into(),)*
+                }
+            }
+        }
+    };
+
+    (
+        $struct_name:ident {
+            coin_type: $coin_type:expr,
+            $($field_name:ident: $field_type:ty),* $(,)?
+        }
+    ) => {
+        pub struct $struct_name {
+            pub coin_type: $coin_type as String,
+            $(pub $field_name: Arg<$field_type>,)*
+        }
+
+        impl $struct_name {
+            #[allow(clippy::too_many_arguments)]
+            pub fn new(
+                builder: &mut TransactionBuilder,
+                coin_type: String,
+                $($field_name: $field_type,)*
+            ) -> Self {
+                Self {
+                    coin_type,
                     $($field_name: builder.input(Serialized(&$field_name)).into(),)*
                 }
             }
@@ -64,7 +87,8 @@ impl ConfigDepsArgs {
         addresses: Vec<Address>,
         versions: Vec<u64>,
     ) -> Result<Self> {
-        let extensions_input = get_input(sui_client, EXTENSIONS_OBJECT.parse().unwrap()).await?;
+        let extensions_input =
+            get_object_as_input(sui_client, EXTENSIONS_OBJECT.parse().unwrap()).await?;
         let extensions_argument = builder.input(extensions_input.by_ref());
 
         Ok(Self {

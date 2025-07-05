@@ -14,40 +14,27 @@ use account_multisig_sdk::{
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut client = MultisigClient::new_testnet();
-    client
-        .load_multisig(
-            Address::from_hex("0xbd4128161c82c7b58e320c2cf7ed10a0bffc3de1859593879c15875800bda672")
-                .unwrap(),
-        )
-        .await?;
+    client.load_multisig(
+        Address::from_hex("0xbd4128161c82c7b58e320c2cf7ed10a0bffc3de1859593879c15875800bda672")
+            .unwrap(),
+    ).await?;
     let mut builder = init_tx(client.sui()).await;
 
-    let params = ParamsArgs::new(
+    let (executable, cap) = client.execute_borrow_cap_proper(
         &mut builder,
         "borrow_cap_again".to_string(),
-        "Borrow cap".to_string(),
-        vec![0],
-        1000000000000000000,
-    );
-    // let args = ConfigMultisigArgs::new(
-    //     &mut builder,
-    //     vec![Address::from_hex("0x3c00d56434d581fdfd6e280626f7c8ee75cc9dac134d84290491e65f9b8b7161").unwrap()],
-    //     vec![1],
-    //     vec![vec![]],
-    //     1,
-    //     vec![],
-    //     vec![],
-    // );
-    // client.request_config_multisig(&mut builder, params, args).await?;
+        "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+    ).await?;
 
-    client
-        .request_borrow_cap(
-            &mut builder,
-            params,
-            (),
-            vec!["0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap"],
-        )
-        .await?;
+    client.execute_return_cap(
+        &mut builder,
+        "borrow_cap_again".to_string(),
+        executable,
+        cap,
+        "0xd06dfba27a48b7b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+        1,
+        true,
+    ).await?;
 
     execute_tx(client.sui(), builder).await;
 

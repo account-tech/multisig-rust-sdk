@@ -11,7 +11,7 @@ pub async fn get_object(sui_client: &Client, id: Address) -> Result<Object> {
         .ok_or(anyhow!("Object not found {}", id))
 }
 
-pub async fn get_object_as_input_owned(sui_client: &Client, id: Address) -> Result<Input> {
+pub async fn get_object_as_input(sui_client: &Client, id: Address) -> Result<Input> {
     let object = get_object(sui_client, id).await?;
     let mut input = Input::from(&object);
     
