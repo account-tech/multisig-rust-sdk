@@ -121,12 +121,12 @@ impl MultisigClient {
     pub async fn approve_intent(
         &self,
         builder: &mut TransactionBuilder,
-        intent_key: String,
+        intent_key: &str,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let key_arg = builder.input(Serialized(&intent_key));
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let key_arg = self.key_arg(builder, &intent_key).await?;
 
-        am::multisig::approve_intent(builder, ms_arg.into(), key_arg.into());
+        am::multisig::approve_intent(builder, ms_arg.borrow_mut(), key_arg);
 
         Ok(())
     }
@@ -134,12 +134,12 @@ impl MultisigClient {
     pub async fn disapprove_intent(
         &self,
         builder: &mut TransactionBuilder,
-        intent_key: String,
+        intent_key: &str,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let key_arg = builder.input(Serialized(&intent_key));
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let key_arg = self.key_arg(builder, intent_key).await?;
 
-        am::multisig::disapprove_intent(builder, ms_arg.into(), key_arg.into());
+        am::multisig::disapprove_intent(builder, ms_arg.borrow_mut(), key_arg);
 
         Ok(())
     }
@@ -149,18 +149,13 @@ impl MultisigClient {
     pub async fn deposit_cap<CapType: Key>(
         &self,
         builder: &mut TransactionBuilder,
-        cap: CapType,
+        cap_id: Address,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let cap_arg = builder.input(self.obj(*cap.id().as_address()).await?);
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let cap_arg = self.owned_arg::<CapType>(builder, cap_id).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::access_control::lock_cap::<am::multisig::Multisig, CapType>(
-            builder,
-            auth,
-            ms_arg.into(),
-            cap_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::access_control::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg);
 
         Ok(())
     }
@@ -171,19 +166,12 @@ impl MultisigClient {
         keys: Vec<String>,
         values: Vec<String>,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let keys_arg = builder.input(Serialized(&keys));
-        let values_arg = builder.input(Serialized(&values));
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let keys_arg = self.pure_arg(builder, keys).await?;
+        let values_arg = self.pure_arg(builder, values).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-
-        ap::config::edit_metadata::<am::multisig::Approvals>(
-            builder,
-            auth,
-            ms_arg.into(),
-            keys_arg.into(),
-            values_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        ap::config::edit_metadata(builder, auth, ms_arg.borrow_mut(), keys_arg, values_arg);
 
         Ok(())
     }
@@ -192,39 +180,34 @@ impl MultisigClient {
         &self,
         builder: &mut TransactionBuilder,
     ) -> Result<()> {
-        let extensions_arg =
-            builder.input(self.obj(EXTENSIONS_OBJECT.parse().unwrap()).await?.by_ref());
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let extensions_arg = self.extensions_arg(builder).await?;
 
-        ap::config::update_extensions_to_latest::<am::multisig::Approvals>(
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        ap::config::update_extensions_to_latest(
             builder,
             auth,
-            ms_arg.into(),
-            extensions_arg.into(),
+            ms_arg.borrow_mut(),
+            extensions_arg.borrow(),
         );
 
         Ok(())
     }
 
-    pub async fn deposit_treasury_cap<TreasuryCapType: Key>(
+    pub async fn deposit_treasury_cap<CoinType: MoveType>(
         &self,
         builder: &mut TransactionBuilder,
         max_supply: Option<u64>,
-        cap: TreasuryCapType,
+        cap_id: Address,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let max_supply_arg = builder.input(Serialized(&max_supply));
-        let cap_arg = builder.input(self.obj(*cap.id().as_address()).await?);
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let max_supply_arg = self.pure_arg(builder, max_supply).await?;
+        let cap_arg = self
+            .owned_arg::<sui::coin::TreasuryCap<CoinType>>(builder, cap_id)
+            .await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::currency::lock_cap::<am::multisig::Multisig, TreasuryCapType>(
-            builder,
-            auth,
-            ms_arg.into(),
-            cap_arg.into(),
-            max_supply_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::currency::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg, max_supply_arg);
 
         Ok(())
     }
@@ -234,25 +217,23 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         coins_to_merge: Vec<Address>,
         amounts_to_split: Vec<u64>,
-        _coin_type: CoinType,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
+        let mut ms_arg = self.multisig_arg(builder).await?;
         let mut coin_inputs = Vec::new();
         for coin in coins_to_merge {
-            let input = Input::from(&utils::get_object(&self.sui_client, coin).await?);
-            coin_inputs.push(builder.input(input.by_val().with_receiving_kind()));
+            coin_inputs.push(builder.input(self.obj(coin).await?.with_receiving_kind()));
         }
 
-        let to_merge_arg = builder.make_move_vec(None, coin_inputs);
-        let to_split_arg = builder.input(Serialized(&amounts_to_split));
+        let to_merge_arg = builder.make_move_vec(None, coin_inputs).into();
+        let to_split_arg = self.pure_arg(builder, amounts_to_split).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        ap::owned::merge_and_split::<am::multisig::Approvals, CoinType>(
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        ap::owned::merge_and_split::<_, CoinType>(
             builder,
             auth,
-            ms_arg.into(),
-            to_merge_arg.into(),
-            to_split_arg.into(),
+            ms_arg.borrow_mut(),
+            to_merge_arg,
+            to_split_arg,
         );
 
         Ok(())
@@ -265,19 +246,21 @@ impl MultisigClient {
         package_name: &str,
         timelock_duration: u64, // can be 0
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let package_name_arg = builder.input(Serialized(&package_name));
-        let timelock_duration_arg = builder.input(Serialized(&timelock_duration));
-        let upgrade_cap_arg = builder.input(self.obj(cap_id).await?);
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let package_name_arg = self.pure_arg(builder, package_name.to_string()).await?;
+        let timelock_duration_arg = self.pure_arg(builder, timelock_duration).await?;
+        let upgrade_cap_arg = self
+            .owned_arg::<sui::package::UpgradeCap>(builder, cap_id)
+            .await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::package_upgrade::lock_cap::<am::multisig::Approvals>(
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::package_upgrade::lock_cap(
             builder,
             auth,
-            ms_arg.into(),
-            upgrade_cap_arg.into(),
-            package_name_arg.into(),
-            timelock_duration_arg.into(),
+            ms_arg.borrow_mut(),
+            upgrade_cap_arg,
+            package_name_arg,
+            timelock_duration_arg,
         );
 
         Ok(())
@@ -288,38 +271,26 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         vault_name: &str,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let vault_name_arg = builder.input(Serialized(&vault_name));
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let vault_name_arg = self.pure_arg(builder, vault_name.to_string()).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::vault::open::<am::multisig::Approvals>(
-            builder,
-            auth,
-            ms_arg.into(),
-            vault_name_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::vault::open(builder, auth, ms_arg.borrow_mut(), vault_name_arg);
 
         Ok(())
     }
 
-    pub async fn deposit_from_wallet<Coin: Key>(
+    pub async fn deposit_from_wallet<CoinType: MoveType>(
         &self,
         builder: &mut TransactionBuilder,
         vault_name: &str,
-        coin: Coin,
+        coin_arg: Arg<sui::coin::Coin<CoinType>>, // splitted in previous command
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let vault_name_arg = builder.input(Serialized(&vault_name));
-        let coin_arg = builder.input(self.obj(*coin.id().as_address()).await?);
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let vault_name_arg = self.pure_arg(builder, vault_name.to_string()).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::vault::deposit::<am::multisig::Approvals, Coin>(
-            builder,
-            auth,
-            ms_arg.into(),
-            vault_name_arg.into(),
-            coin_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::vault::deposit(builder, auth, ms_arg.borrow_mut(), vault_name_arg, coin_arg);
 
         Ok(())
     }
@@ -329,16 +300,11 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         vault_name: &str,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_mut());
-        let vault_name_arg = builder.input(Serialized(&vault_name));
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let vault_name_arg = self.pure_arg(builder, vault_name.to_string()).await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::vault::close::<am::multisig::Approvals>(
-            builder,
-            auth,
-            ms_arg.into(),
-            vault_name_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::vault::close(builder, auth, ms_arg.borrow_mut(), vault_name_arg);
 
         Ok(())
     }
@@ -348,17 +314,20 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         vesting_id: Address,
         cap_id: Address,
-        _coin_type: CoinType,
     ) -> Result<()> {
-        let vesting_arg = builder.input(self.obj(vesting_id).await?);
-        let cap_arg = builder.input(self.obj(cap_id).await?);
-        let clock_arg = builder.input(self.obj(CLOCK_OBJECT.parse().unwrap()).await?.by_ref());
+        let mut vesting_arg = self
+            .shared_mut_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
+            .await?;
+        let cap_arg = self
+            .owned_arg::<aa::vesting::ClaimCap>(builder, cap_id)
+            .await?;
+        let clock_arg = self.clock_arg(builder).await?;
 
-        aa::vesting::claim::<CoinType>(
+        aa::vesting::claim(
             builder,
-            vesting_arg.into(),
-            cap_arg.into(),
-            clock_arg.into(),
+            vesting_arg.borrow_mut(),
+            cap_arg.borrow(),
+            clock_arg.borrow(),
         );
 
         Ok(())
@@ -370,16 +339,13 @@ impl MultisigClient {
         vesting_id: Address,
         _coin_type: CoinType,
     ) -> Result<()> {
-        let ms_arg = builder.input(self.obj(self.multisig_id()?).await?.by_ref());
-        let vesting_arg = builder.input(self.obj(vesting_id).await?);
+        let ms_arg = self.multisig_arg(builder).await?;
+        let vesting_arg = self
+            .shared_val_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
+            .await?;
 
-        let auth = am::multisig::authenticate(builder, ms_arg.into());
-        aa::vesting::cancel_payment::<am::multisig::Multisig, CoinType>(
-            builder,
-            auth,
-            ms_arg.into(),
-            vesting_arg.into(),
-        );
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::vesting::cancel_payment(builder, auth, vesting_arg, ms_arg.borrow());
 
         Ok(())
     }
@@ -388,11 +354,12 @@ impl MultisigClient {
         &self,
         builder: &mut TransactionBuilder,
         vesting_id: Address,
-        _coin_type: CoinType,
     ) -> Result<()> {
-        let vesting_arg = builder.input(self.obj(vesting_id).await?);
+        let vesting_arg = self
+            .shared_val_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
+            .await?;
 
-        aa::vesting::destroy_empty::<CoinType>(builder, vesting_arg.into());
+        aa::vesting::destroy_empty(builder, vesting_arg);
 
         Ok(())
     }
@@ -402,9 +369,11 @@ impl MultisigClient {
         builder: &mut TransactionBuilder,
         cap_id: Address,
     ) -> Result<()> {
-        let cap_arg = builder.input(self.obj(cap_id).await?);
+        let cap_arg = self
+            .owned_arg::<aa::vesting::ClaimCap>(builder, cap_id)
+            .await?;
 
-        aa::vesting::destroy_cap(builder, cap_arg.into());
+        aa::vesting::destroy_cap(builder, cap_arg);
 
         Ok(())
     }
@@ -479,9 +448,9 @@ impl MultisigClient {
         (),
         |builder, auth, multisig, params, outcome, _| {
             aa::access_control_intents::request_borrow_cap::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-            CapType,
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+                CapType,
             >(builder, auth, multisig, params, outcome)
         },
         CapType,
@@ -511,12 +480,8 @@ impl MultisigClient {
         let clock_arg = self.clock_arg(builder).await?;
         let mut ms_arg = self.multisig_arg(builder).await?;
 
-        let mut executable = am::multisig::execute_intent(
-            builder, 
-            ms_arg.borrow_mut(), 
-            key_arg, 
-            clock_arg.borrow()
-        );
+        let mut executable =
+            am::multisig::execute_intent(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow());
 
         let cap = aa::access_control_intents::execute_borrow_cap(
             builder,
@@ -527,7 +492,7 @@ impl MultisigClient {
         Ok((executable, cap))
     }
 
-    // Use the Cap between borrow and return 
+    // Use the Cap between borrow and return
 
     pub async fn execute_return_cap<Cap: MoveType + Key>(
         &self,
@@ -541,12 +506,7 @@ impl MultisigClient {
             am::multisig::Multisig,
             am::multisig::Approvals,
             Cap,
-        >(
-            builder,
-            executable.borrow_mut(),
-            ms_arg.borrow_mut(),
-            cap,
-        );
+        >(builder, executable.borrow_mut(), ms_arg.borrow_mut(), cap);
 
         ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
             builder,
@@ -890,6 +850,45 @@ impl MultisigClient {
         utils::get_object_as_input(&self.sui_client, id).await
     }
 
+    async fn pure_arg<Pure: serde::Serialize + MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        value: Pure,
+    ) -> Result<Arg<Pure>> {
+        let value_arg = builder.input(Serialized(&value)).into();
+        Ok(value_arg)
+    }
+
+    async fn owned_arg<Obj: MoveType + Key>(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Arg<Obj>> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input).into();
+        Ok(object_arg)
+    }
+
+    async fn shared_mut_arg<Obj: MoveType + Key>(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Arg<Obj>> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input.by_mut()).into();
+        Ok(object_arg)
+    }
+
+    async fn shared_val_arg<Obj: MoveType + Key>(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Arg<Obj>> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input.by_val()).into();
+        Ok(object_arg)
+    }
+
     async fn key_arg(
         &self,
         builder: &mut TransactionBuilder,
@@ -926,8 +925,8 @@ impl MultisigClient {
 }
 
 #[macro_export]
-macro_rules! move_type {
-    ($full_path:expr) => {{
+macro_rules! define_move_type {
+    ($full_path:expr) => {
         use move_types::{MoveType, StructTag, TypeTag};
 
         #[derive(serde::Serialize, serde::Deserialize)]
@@ -955,14 +954,12 @@ macro_rules! move_type {
                 }))
             }
         }
-
-        Generic {}
-    }};
+    };
 }
 
 #[macro_export]
-macro_rules! move_object {
-    ($id:expr, $full_path:expr) => {{
+macro_rules! define_move_object {
+    ($id:expr, $full_path:expr) => {
         use move_types::{Key, MoveStruct, MoveType, ObjectId, StructTag, TypeTag};
 
         #[derive(serde::Serialize, serde::Deserialize)]
@@ -981,11 +978,7 @@ macro_rules! move_object {
                 &self.id
             }
         }
-
-        Object {
-            id: $id.parse().unwrap(),
-        }
-    }};
+    };
 }
 
 #[macro_export]
@@ -1115,7 +1108,7 @@ macro_rules! define_intent_interface {
                 $request_call,
                 $($generic_type,)?
             );
-            
+
             define_execute_intent!(
                 [<execute_ $intent_name>],
                 $execute_call,
