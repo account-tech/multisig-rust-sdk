@@ -380,68 +380,68 @@ impl MultisigClient {
 
     // === Intents ===
 
-    define_intent_interface!(
-        config_multisig,
-        params::ConfigMultisigArgs,
-        |builder, auth, multisig, params, outcome, args: params::ConfigMultisigArgs| {
-            am::config::request_config_multisig(
-                builder,
-                auth,
-                multisig,
-                params,
-                outcome,
-                args.addresses,
-                args.weights,
-                args.roles,
-                args.global,
-                args.role_names,
-                args.role_thresholds,
-            )
-        },
-        |builder, executable, multisig| am::config::execute_config_multisig(
-            builder, executable, multisig
-        ),
-        |builder, expired| am::config::delete_config_multisig(builder, expired),
-    );
+    // define_intent_interface!(
+    //     config_multisig,
+    //     params::ConfigMultisigArgs,
+    //     |builder, auth, multisig, params, outcome, args: params::ConfigMultisigArgs| {
+    //         am::config::request_config_multisig(
+    //             builder,
+    //             auth,
+    //             multisig,
+    //             params,
+    //             outcome,
+    //             args.addresses,
+    //             args.weights,
+    //             args.roles,
+    //             args.global,
+    //             args.role_names,
+    //             args.role_thresholds,
+    //         )
+    //     },
+    //     |builder, executable, multisig| am::config::execute_config_multisig(
+    //         builder, executable, multisig
+    //     ),
+    //     |builder, expired| am::config::delete_config_multisig(builder, expired),
+    // );
 
-    define_intent_interface!(
-        config_deps,
-        params::ConfigDepsArgs,
-        |builder, auth, multisig, params, outcome, args: params::ConfigDepsArgs| {
-            ap::config::request_config_deps::<am::multisig::Multisig, am::multisig::Approvals>(
-                builder,
-                auth,
-                multisig,
-                params,
-                outcome,
-                args.extensions.into(),
-                args.names,
-                args.addresses,
-                args.versions,
-            )
-        },
-        |builder, executable, multisig| ap::config::execute_config_deps::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-        >(builder, executable, multisig),
-        |builder, expired| ap::config::delete_config_deps(builder, expired),
-    );
+    // define_intent_interface!(
+    //     config_deps,
+    //     params::ConfigDepsArgs,
+    //     |builder, auth, multisig, params, outcome, args: params::ConfigDepsArgs| {
+    //         ap::config::request_config_deps::<am::multisig::Multisig, am::multisig::Approvals>(
+    //             builder,
+    //             auth,
+    //             multisig,
+    //             params,
+    //             outcome,
+    //             args.extensions.into(),
+    //             args.names,
+    //             args.addresses,
+    //             args.versions,
+    //         )
+    //     },
+    //     |builder, executable, multisig| ap::config::execute_config_deps::<
+    //         am::multisig::Multisig,
+    //         am::multisig::Approvals,
+    //     >(builder, executable, multisig),
+    //     |builder, expired| ap::config::delete_config_deps(builder, expired),
+    // );
 
-    define_intent_interface!(
-        toggle_unverified_allowed,
-        (),
-        |builder, auth, multisig, params, outcome, _| {
-            ap::config::request_toggle_unverified_allowed::<
-                am::multisig::Multisig,
-                am::multisig::Approvals,
-            >(builder, auth, multisig, params, outcome)
-        },
-        |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-        >(builder, executable, multisig),
-        |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
-    );
+    // define_intent_interface!(
+    //     toggle_unverified_allowed,
+    //     (),
+    //     |builder, auth, multisig, params, outcome, _| {
+    //         ap::config::request_toggle_unverified_allowed::<
+    //             am::multisig::Multisig,
+    //             am::multisig::Approvals,
+    //         >(builder, auth, multisig, params, outcome)
+    //     },
+    //     |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
+    //         am::multisig::Multisig,
+    //         am::multisig::Approvals,
+    //     >(builder, executable, multisig),
+    //     |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
+    // );
 
     define_request_intent!(
         request_borrow_cap,
@@ -516,6 +516,23 @@ impl MultisigClient {
 
         Ok(())
     }
+
+    // pub async fn delete_borrow_cap<CapType: MoveType>(
+    //     &self,
+    //     builder: &mut TransactionBuilder,
+    //     intent_key: &str,
+    // ) -> Result<()> {
+    //     let mut ms_arg = self.multisig_arg(builder).await?;
+    //     let clock_arg = self.clock_arg(builder).await?;
+    //     let key_arg = self.key_arg(builder, intent_key).await?;
+    //     let mut expired = ap::account::delete_expired_intent::<
+    //         am::multisig::Multisig,
+    //         am::multisig::Approvals,
+    //     >(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow());
+    //     aa::access_control::delete_borrow::<CapType>(builder, expired.borrow_mut());
+    //     aa::access_control::delete_return::<CapType>(builder, expired.borrow_mut());
+    //     Ok(())
+    // }
 
     define_delete_intent!(
         delete_borrow_cap,
@@ -859,6 +876,17 @@ impl MultisigClient {
         utils::get_object_as_input(&self.sui_client, id).await
     }
 
+    async fn clock_timestamp(&self) -> Result<u64> {
+        let clock_object = utils::get_object(&self.sui_client, CLOCK_OBJECT.parse().unwrap()).await?;
+        if let ObjectData::Struct(obj) = clock_object.data() {
+            let clock: sui::clock::Clock = bcs::from_bytes(obj.contents())
+                .map_err(|e| anyhow!("Failed to parse clock object: {}", e))?;   
+            Ok(clock.timestamp_ms)
+        } else {
+            Err(anyhow!("Clock object data is missing"))
+        }
+    }
+
     async fn pure_arg<Pure: serde::Serialize + MoveType>(
         &self,
         builder: &mut TransactionBuilder,
@@ -1092,6 +1120,15 @@ macro_rules! define_delete_intent {
             let mut ms_arg = self.multisig_arg(builder).await?;
             let clock_arg = self.clock_arg(builder).await?;
             let key_arg = self.key_arg(builder, intent_key).await?;
+
+            if let Some(intent) = self.intents().and_then(|i| i.get_intent(intent_key)) {
+                let current_timestamp = self.clock_timestamp().await?;
+                if (current_timestamp < intent.expiration_time && intent.execution_times.len() > 0) {
+                    return Err(anyhow!("Intent cannot be deleted"));
+                }
+            } else {
+                return Err(anyhow!("Intent not found"));
+            }
 
             let mut expired = ap::account::delete_expired_intent::<
                 am::multisig::Multisig,
