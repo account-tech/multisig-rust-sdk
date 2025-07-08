@@ -6,51 +6,53 @@ use sui_sdk_types::{Address, ExecutionStatus};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
 use account_multisig_sdk::{
-    define_move_type,
-    params::{ConfigMultisigArgs, ParamsArgs},
-    MultisigClient,
+    define_move_object,
+    MultisigClient, borrow_and_return_cap,
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut client = MultisigClient::new_testnet();
-    client
-        .load_multisig(
-            Address::from_hex("0xbd4128161c82c7b58e320c2cf7ed10a0bffc3de1859593879c15875800bda672")
-                .unwrap(),
-        )
-        .await?;
+    client.load_multisig(
+        Address::from_hex("0xbd4128161c82c7b58e320c2cf7ed10a0bffc3de1859593879c15875800bda672")
+            .unwrap(),
+    ).await?;
     let mut builder = init_tx(client.sui()).await;
 
-    let params = ParamsArgs::new(
-        &mut builder,
-        "borrow_cap_again".to_string(),
-        "Borrow cap".to_string(),
-        vec![0],
-        1000000000000000000,
-    );
-    // let args = ConfigMultisigArgs::new(
-    //     &mut builder,
-    //     vec![Address::from_hex("0x3c00d56434d581fdfd6e280626f7c8ee75cc9dac134d84290491e65f9b8b7161").unwrap()],
-    //     vec![1],
-    //     vec![vec![]],
-    //     1,
-    //     vec![],
-    //     vec![],
-    // );
-    // client.request_config_multisig(&mut builder, params, args).await?;
-
-    define_move_type!(
+    // execute intent
+    define_move_object!(
         AdminCap,
+        "",
         "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
     );
-    client
-        .request_borrow_cap::<AdminCap>(
-            &mut builder,
-            params,
-            (),
-        )
-        .await?;
+
+    // using helper macro
+    borrow_and_return_cap!(
+        &client,
+        &mut builder,
+        "borrow_cap_again",
+        AdminCap,
+        |_builder, _cap| {},
+    );
+
+    // // using client functions
+    // let clock_arg = client.clock_arg(&mut builder).await?;
+    // let mut ms_arg = client.multisig_arg(&mut builder).await?;
+    // let (executable, cap) = client.execute_borrow_cap::<AdminCap>(
+    //     &mut builder,
+    //     &mut ms_arg,
+    //     &clock_arg,
+    //     "borrow_cap_again",
+    // ).await?;
+
+    // // do something with the cap then return it
+    // client.execute_return_cap::<AdminCap>(
+    //     &mut builder,
+    //     &mut ms_arg,
+    //     executable,
+    //     cap,
+    //     "borrow_cap_again",
+    // ).await?;
 
     execute_tx(client.sui(), builder).await;
 

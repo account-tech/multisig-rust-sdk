@@ -508,7 +508,6 @@ impl MultisigClient {
         mut executable: Arg<ap::executable::Executable<am::multisig::Approvals>>,
         cap: Arg<Cap>,
         intent_key: &str,
-        repeat: u64,
     ) -> Result<()> {
         aa::access_control_intents::execute_return_cap::<
             am::multisig::Multisig,
@@ -530,10 +529,9 @@ impl MultisigClient {
                 am::multisig::Approvals,
             >(builder, ms_arg.borrow_mut(), key_arg);
 
-            for _ in 0..repeat {
-                aa::access_control::delete_borrow::<Cap>(builder, expired.borrow_mut());
-                aa::access_control::delete_return::<Cap>(builder, expired.borrow_mut());
-            }
+            aa::access_control::delete_borrow::<Cap>(builder, expired.borrow_mut());
+            aa::access_control::delete_return::<Cap>(builder, expired.borrow_mut());
+
             ap::intents::destroy_empty_expired(builder, expired);
         }
 
@@ -965,6 +963,38 @@ impl MultisigClient {
         let ms_arg = builder.input(ms_input.by_mut()).into();
         Ok(ms_arg)
     }
+}
+
+// helper for the BorrowCap intent
+#[macro_export]
+macro_rules! borrow_and_return_cap {
+    (
+        $multisig_client: expr,
+        $builder: expr,
+        $intent_key: expr,
+        $cap_obj: ty,
+        $use_cap: expr $(,)?
+    ) => {{
+        let mut ms_arg = $multisig_client.multisig_arg($builder).await?;
+        let clock_arg = $multisig_client.clock_arg($builder).await?;
+        
+        let (executable, cap) = $multisig_client.execute_borrow_cap::<$cap_obj>(
+            $builder,
+            &mut ms_arg,
+            &clock_arg,
+            $intent_key,
+        ).await?;
+
+        $use_cap($builder, cap.borrow());
+
+        $multisig_client.execute_return_cap::<$cap_obj>(
+            $builder,
+            &mut ms_arg,
+            executable,
+            cap,
+            $intent_key,
+        ).await?;
+    }};
 }
 
 #[macro_export]

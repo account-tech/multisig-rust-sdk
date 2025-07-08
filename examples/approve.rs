@@ -2,14 +2,10 @@ use anyhow::Result;
 use base64ct::{Base64, Encoding};
 use sui_crypto::{ed25519::Ed25519PrivateKey, SuiSigner};
 use sui_graphql_client::{Client, PaginationFilter};
-use sui_sdk_types::{Address, ExecutionStatus, TransactionKind};
+use sui_sdk_types::{Address, ExecutionStatus};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
-use account_multisig_sdk::{
-    define_move_object,
-    params::{ConfigMultisigArgs, ParamsArgs},
-    MultisigClient,
-};
+use account_multisig_sdk::MultisigClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
