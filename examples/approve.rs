@@ -20,30 +20,8 @@ async fn main() -> Result<()> {
     ).await?;
     let mut builder = init_tx(client.sui()).await;
 
-    // execute intent
-    define_move_object!(
-        AdminCap,
-        "",
-        "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
-    );
-    let clock_arg = client.clock_arg(&mut builder).await?;
-    let mut ms_arg = client.multisig_arg(&mut builder).await?;
-    let (executable, cap) = client.execute_borrow_cap::<AdminCap>(
-        &mut builder,
-        &mut ms_arg,
-        &clock_arg,
-        "borrow_cap_again",
-    ).await?;
-
-    // do something with the cap then return it
-    client.execute_return_cap::<AdminCap>(
-        &mut builder,
-        &mut ms_arg,
-        executable,
-        cap,
-        "borrow_cap_again",
-        1,
-    ).await?;
+    // approve intent
+    client.approve_intent(&mut builder, "borrow_cap_again").await?;
 
     execute_tx(client.sui(), builder).await;
 
