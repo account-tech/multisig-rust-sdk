@@ -468,6 +468,7 @@ impl MultisigClient {
     //     CapObject:Key,
     // );
 
+    /// Use the borrow_and_return_cap! macro instead
     pub async fn execute_borrow_cap<Cap: Key>(
         &self,
         builder: &mut TransactionBuilder,
@@ -547,293 +548,122 @@ impl MultisigClient {
         CapType,
     );
 
-    // define_intent_interface!(
-    //     disable_rules,
-    //     params::DisableRulesArgs,
-    //     |builder: &mut TransactionBuilder,
-    //      auth,
-    //      multisig,
-    //      params,
-    //      outcome,
-    //      args: params::DisableRulesArgs,
-    //      type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "request_disable_rules".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![
-    //                 auth,
-    //                 multisig,
-    //                 params,
-    //                 outcome,
-    //                 args.mint.into(),
-    //                 args.burn.into(),
-    //                 args.update_symbol.into(),
-    //                 args.update_name.into(),
-    //                 args.update_description.into(),
-    //                 args.update_icon.into(),
-    //             ],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, executable, multisig, _, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "execute_disable_rules".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![executable, multisig],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, expired, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency".parse().unwrap(),
-    //                 "delete_disable".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![expired],
-    //         );
-    //     },
-    // );
+    define_intent_interface!(
+        disable_rules,
+        params::DisableRulesArgs,
+        |builder, auth, multisig, params, outcome, args: params::DisableRulesArgs| {
+            aa::currency_intents::request_disable_rules::<_, _, CoinType>(
+                builder, auth, multisig, params, outcome, 
+                args.mint, args.burn, args.update_symbol, args.update_name, args.update_description, args.update_icon
+            );
+        },
+        |builder: &mut TransactionBuilder, executable, multisig| {
+            aa::currency_intents::execute_disable_rules::<_, _, CoinType>(builder, executable, multisig);
+        },
+        |builder: &mut TransactionBuilder, expired| {
+            aa::currency::delete_disable::<CoinType>(builder, expired);
+        },
+        CoinType,
+    );
 
     // define_intent_interface!(
     //     update_metadata,
     //     params::UpdateMetadataArgs,
-    //     |builder: &mut TransactionBuilder,
-    //      auth,
-    //      multisig,
-    //      params,
-    //      outcome,
-    //      args: params::UpdateMetadataArgs,
-    //      type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "request_update_metadata".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![
-    //                 auth,
-    //                 multisig,
-    //                 params,
-    //                 outcome,
-    //                 args.symbol.into(),
-    //                 args.name.into(),
-    //                 args.description.into(),
-    //                 args.icon_url.into(),
-    //             ],
-    //         );
+    //     |builder, auth, multisig_input, params, outcome, args: params::UpdateMetadataArgs| {
+    //         aa::currency_intents::request_update_metadata::<_, _, CoinType>(
+    //             builder, auth, multisig_input, params, outcome,
+    //             args.symbol, args.name, args.description, args.icon_url,
+    //         )
     //     },
-    //     |builder: &mut TransactionBuilder, executable, multisig, coin_metadata_arg, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "execute_update_metadata".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![executable, multisig, coin_metadata_arg],
-    //         );
+    //     |builder, executable, multisig, some_coin_metadata: Option<Argument>| {
+    //         assert!(some_coin_metadata.is_some(), "Coin metadata is required");
+    //         aa::currency_intents::execute_update_metadata::<
+    //             am::multisig::Multisig,
+    //             am::multisig::Approvals,
+    //             CoinType,
+    //         >(
+    //             builder,
+    //             executable,
+    //             multisig,
+    //             some_coin_metadata.unwrap().into(),
+    //         )
     //     },
-    //     |builder: &mut TransactionBuilder, expired, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency".parse().unwrap(),
-    //                 "delete_update".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![expired],
-    //         );
-    //     },
+    //     |builder, expired| aa::currency::delete_update::<CoinType>(builder, expired),
+    //     CoinType,
     // );
 
-    // define_intent_interface!(
-    //     mint_and_transfer,
-    //     params::MintAndTransferArgs,
-    //     |builder: &mut TransactionBuilder,
-    //      auth,
-    //      multisig,
-    //      params,
-    //      outcome,
-    //      args: params::MintAndTransferArgs,
-    //      type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "request_mint_and_transfer".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![
-    //                 auth,
-    //                 multisig,
-    //                 params,
-    //                 outcome,
-    //                 args.amounts.into(),
-    //                 args.recipients.into(),
-    //             ],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, executable, multisig, _, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "execute_mint_and_transfer".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![executable, multisig],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, expired, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency".parse().unwrap(),
-    //                 "delete_mint".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![expired],
-    //         );
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "transfer".parse().unwrap(),
-    //                 "delete_transfer".parse().unwrap(),
-    //                 vec![],
-    //             ),
-    //             vec![expired],
-    //         );
-    //     },
-    // );
+    define_intent_interface!(
+        mint_and_transfer,
+        params::MintAndTransferArgs,
+        |builder, auth, multisig_input, params, outcome, args: params::MintAndTransferArgs| {
+            aa::currency_intents::request_mint_and_transfer::<_, _, CoinType>(
+                builder, auth, multisig_input,
+                params, outcome, args.amounts, args.recipients,
+            )
+        },
+        |builder, executable, multisig| {
+            aa::currency_intents::execute_mint_and_transfer::<_, _, CoinType>(
+                builder, executable, multisig
+            )
+        },
+        |builder: &mut TransactionBuilder, expired: Argument| {
+            aa::currency::delete_mint::<CoinType>(builder, expired.into());
+            aa::transfer::delete_transfer(builder, expired.into());
+        },
+        CoinType,
+    );
 
-    // define_intent_interface!(
-    //     mint_and_vest,
-    //     params::MintAndVestArgs,
-    //     |builder: &mut TransactionBuilder,
-    //      auth,
-    //      multisig,
-    //      params,
-    //      outcome,
-    //      args: params::MintAndVestArgs,
-    //      type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "request_mint_and_vest".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![
-    //                 auth,
-    //                 multisig,
-    //                 params,
-    //                 outcome,
-    //                 args.total_amount.into(),
-    //                 args.start_timestamp.into(),
-    //                 args.end_timestamp.into(),
-    //                 args.recipient.into(),
-    //             ],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, executable, multisig, _, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "execute_mint_and_vest".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![executable, multisig],
-    //         );
-    //     },
-    //     |builder: &mut TransactionBuilder, expired, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency".parse().unwrap(),
-    //                 "delete_mint".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![expired],
-    //         );
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "vesting".parse().unwrap(),
-    //                 "delete_vest".parse().unwrap(),
-    //                 vec![],
-    //             ),
-    //             vec![expired],
-    //         );
-    //     },
-    // );
+    define_intent_interface!(
+        mint_and_vest,
+        params::MintAndVestArgs,
+        |builder, auth, multisig_input, params, outcome, args: params::MintAndVestArgs| {
+            aa::currency_intents::request_mint_and_vest::<_, _, CoinType>(
+                builder, auth, multisig_input, params, outcome,
+                args.total_amount, args.start_timestamp, args.end_timestamp, args.recipient,
+            )
+        },
+        |builder, executable, multisig| {
+            aa::currency_intents::execute_mint_and_vest::<_, _, CoinType>(
+                builder, executable, multisig
+            )
+        },
+        |builder: &mut TransactionBuilder, expired: Argument| {
+            aa::currency::delete_mint::<CoinType>(builder, expired.into());
+            aa::vesting::delete_vest(builder, expired.into());
+        },
+        CoinType,
+    );
 
     // define_intent_interface!(
     //     withdraw_and_burn,
+    //     CoinType,
+    //     Coin: Key,
     //     params::WithdrawAndBurnArgs,
-    //     |builder: &mut TransactionBuilder,
-    //      auth,
-    //      multisig,
-    //      params,
-    //      outcome,
-    //      args: params::WithdrawAndBurnArgs,
-    //      type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "request_withdraw_and_burn".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![
-    //                 auth,
-    //                 multisig,
-    //                 params,
-    //                 outcome,
-    //                 args.coin_id.into(),
-    //                 args.amount.into(),
-    //             ],
-    //         );
+    //     |builder, auth, multisig_input, params, outcome, args: params::WithdrawAndBurnArgs| {
+    //         aa::currency_intents::request_withdraw_and_burn::<
+    //             am::multisig::Multisig,
+    //             am::multisig::Approvals,
+    //             CoinType,
+    //         >(
+    //             builder,
+    //             auth,
+    //             multisig_input,
+    //             params,
+    //             outcome,
+    //             args.coin_id,
+    //             args.amount,
+    //         )
     //     },
-    //     |builder: &mut TransactionBuilder, executable, multisig, coin_object_arg, type_args| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency_intents".parse().unwrap(),
-    //                 "execute_withdraw_and_burn".parse().unwrap(),
-    //                 type_args,
-    //             ),
-    //             vec![executable, multisig, coin_object_arg],
-    //         );
+    //     |builder, executable, multisig, some_receiving_coin: Option<Argument>| {
+    //         aa::currency_intents::execute_withdraw_and_burn::<
+    //             am::multisig::Multisig,
+    //             am::multisig::Approvals,
+    //             CoinType,
+    //         >(builder, executable, multisig, some_receiving_coin.unwrap().into())
     //     },
-    //     |builder: &mut TransactionBuilder, expired, type_args: Vec<TypeTag>| {
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_PROTOCOL_PACKAGE.parse().unwrap(),
-    //                 "owned".parse().unwrap(),
-    //                 "delete_withdraw".parse().unwrap(),
-    //                 vec![type_args[0].clone()],
-    //             ),
-    //             vec![expired],
-    //         );
-    //         builder.move_call(
-    //             Function::new(
-    //                 ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-    //                 "currency".parse().unwrap(),
-    //                 "delete_burn".parse().unwrap(),
-    //                 vec![type_args[1].clone()],
-    //             ),
-    //             vec![expired],
-    //         );
+    //     |builder: &mut TransactionBuilder, multisig: Argument, expired: Argument| {
+    //         ap::owned::delete_withdraw::<Coin>(builder, multisig.into(), expired.into());
+    //         aa::currency::delete_burn::<CoinType>(builder, expired.into());
     //     },
     // );
 
@@ -1227,7 +1057,7 @@ macro_rules! define_intent_interface {
                 [<execute_ $intent_name>],
                 $execute_call,
                 $delete_calls,
-                $($generic_type:$trait_bound,)?
+                $($generic_type $(:$trait_bound)?,)?
             );
 
             define_delete_intent!(
