@@ -181,204 +181,279 @@ impl TryFrom<u8> for Policy {
     }
 }
 
-pub fn deserialize_actions(move_intent_type: &str, actions: &[(Vec<TypeTag>, Vec<u8>)]) -> Result<IntentActionsType> {
-    match move_intent_type {
-        "460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config::ConfigMultisigIntent" => {
-            let action: am::config::ConfigMultisigAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ConfigMultisig(ConfigMultisigFields {
-                global: action.config.global,
-                members: action.config.members.iter().map(|member| (member.addr, member.weight, member.roles.contents.iter().map(|role| role.to_string()).collect())).collect(),
-                roles: action.config.roles.iter().map(|role| (role.name.to_string(), role.threshold)).collect(),
-            }))
-        },
-        "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ConfigDepsIntent" => {
-            let action: ap::config::ConfigDepsAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ConfigDeps(ConfigDepsFields {
-                deps: action.deps.iter().map(|dep| (dep.name.to_owned(), dep.addr, dep.version)).collect(),
-            }))
-        },
-        "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ToggleUnverifiedAllowedIntent" => {
-            let _action: ap::config::ToggleUnverifiedAllowedAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedFields {}))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::access_control_intents::BorrowCapIntent" => {
-            let _action: aa::access_control::BorrowAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::BorrowCap(BorrowCapFields {
-                cap_type: actions[0].0[0].to_string(),
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::DisableRulesIntent" => {
-            let action: aa::currency::DisableAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::DisableRules(DisableRulesFields {
-                coin_type: actions[0].0[0].to_string(),
-                mint: action.mint,
-                burn: action.burn,
-                update_symbol: action.update_symbol,
-                update_name: action.update_name,
-                update_description: action.update_description,
-                update_icon: action.update_icon,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::UpdateMetadataIntent" => {
-            let action: aa::currency::UpdateAction<()> = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::UpdateMetadata(UpdateMetadataFields {
-                coin_type: actions[0].0[0].to_string(),
-                new_name: action.name,
-                new_symbol: action.symbol,
-                new_description: action.description,
-                new_icon_url: action.icon_url,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::MintAndTransferIntent" => {
-            let mut transfers = Vec::new();
-            for chunk in actions.chunks(2) {
-                let mint: aa::currency::MintAction<()> = bcs::from_bytes(&chunk[0].1)?;
-                let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
-                transfers.push((mint.amount, transfer.recipient));
-            }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum IntentType {
+    ConfigMultisig,
+    ConfigDeps,
+    ToggleUnverifiedAllowed,
+    BorrowCap,
+    DisableRules,
+    UpdateMetadata,
+    MintAndTransfer,
+    MintAndVest,
+    WithdrawAndBurn,
+    TakeNfts,
+    ListNfts,
+    WithdrawAndTransferToVault,
+    WithdrawAndTransfer,
+    WithdrawAndVest,
+    UpgradePackage,
+    RestrictPolicy,
+    SpendAndTransfer,
+    SpendAndVest,
+}
 
-            Ok(IntentActionsType::MintAndTransfer(MintAndTransferFields { 
-                coin_type: actions[0].0[0].to_string(), 
-                transfers 
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::MintAndVestIntent" => {
-            let mint: aa::currency::MintAction<()> = bcs::from_bytes(&actions[0].1)?;
-            let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
+impl TryFrom<&str> for IntentType {
+    type Error = anyhow::Error;
 
-            Ok(IntentActionsType::MintAndVest(MintAndVestFields {
-                coin_type: actions[0].0[0].to_string(),
-                amount: mint.amount,
-                start: vest.start_timestamp,
-                end: vest.end_timestamp,
-                recipient: vest.recipient,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::WithdrawAndBurnIntent" => {
-            let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
-            let burn: aa::currency::BurnAction<()> = bcs::from_bytes(&actions[1].1)?;
-
-            Ok(IntentActionsType::WithdrawAndBurn(WithdrawAndBurnFields {
-                coin_type: actions[1].0[0].to_string(),
-                coin_id: withdraw.object_id.into(),
-                amount: burn.amount,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::kiosk_intents::TakeNftsIntent" => {
-            let (mut kiosk_name, mut recipient) = (String::new(), Address::ZERO);
-            let mut nft_ids = Vec::new();
-            for action in actions {
-                let take: aa::kiosk::TakeAction = bcs::from_bytes(&action.1)?;
-                if kiosk_name.is_empty() {
-                    kiosk_name = take.name.to_owned();
-                }
-                if recipient == Address::ZERO {
-                    recipient = take.recipient;
-                }
-                nft_ids.push(take.nft_id.into());
-            }
-            
-            Ok(IntentActionsType::TakeNfts(TakeNftsFields {
-                kiosk_name,
-                nft_ids,
-                recipient,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::kiosk_intents::ListNftsIntent" => {
-            let mut kiosk_name = String::new();
-            let mut listings = Vec::new();
-            for action in actions {
-                let list: aa::kiosk::ListAction = bcs::from_bytes(&action.1)?;
-                if kiosk_name.is_empty() {
-                    kiosk_name = list.name.to_owned();
-                }
-                listings.push((list.nft_id.into(), list.price));
-            }
-            
-            Ok(IntentActionsType::ListNfts(ListNftsFields {
-                kiosk_name,
-                listings,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndTransferToVaultIntent" => {
-            let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
-            let deposit: aa::vault::DepositAction<()> = bcs::from_bytes(&actions[1].1)?;
-
-            Ok(IntentActionsType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultFields { 
-                coin_type: actions[0].0[0].to_string(), 
-                coin_id: withdraw.object_id.into(),
-                coin_amount: deposit.amount,
-                vault_name: deposit.name.to_owned(),
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndTransferIntent" => {
-            let mut transfers = Vec::new();
-            for chunk in actions.chunks(2) {
-                let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&chunk[0].1)?;
-                let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
-                transfers.push((withdraw.object_id.into(), transfer.recipient));
-            }
-
-            Ok(IntentActionsType::WithdrawAndTransfer(WithdrawAndTransferFields { 
-                transfers
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndVestIntent" => {
-            let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
-            let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
-
-            Ok(IntentActionsType::WithdrawAndVest(WithdrawAndVestFields {
-                coin_id: withdraw.object_id.into(),
-                start: vest.start_timestamp,
-                end: vest.end_timestamp,
-                recipient: vest.recipient,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::UpgradePackageIntent" => {
-            let upgrade: aa::package_upgrade::UpgradeAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::UpgradePackage(UpgradePackageFields {
-                package_name: upgrade.name.to_owned(),
-                digest: upgrade.digest.to_vec(),
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::RestrictPolicyIntent" => {
-            let restrict: aa::package_upgrade::RestrictAction = bcs::from_bytes(&actions[0].1)?;
-            Ok(IntentActionsType::RestrictPolicy(RestrictPolicyFields {
-                package_name: restrict.name.to_owned(),
-                policy: Policy::try_from(restrict.policy)?,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::vault_intents::SpendAndTransferIntent" => {
-            let mut vault_name = String::new();
-            let mut transfers = Vec::new();
-            for chunk in actions.chunks(2) {
-                let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&chunk[0].1)?;
-                let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
-                if vault_name.is_empty() {
-                    vault_name = spend.name.to_owned();
-                }
-                transfers.push((spend.amount, transfer.recipient));
-            }
-
-            Ok(IntentActionsType::SpendAndTransfer(SpendAndTransferFields { 
-                vault_name,
-                coin_type: actions[0].0[0].to_string(),
-                transfers,
-            }))
-        },
-        "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::vault_intents::SpendAndVestIntent" => {
-            let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&actions[0].1)?;
-            let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
-
-            Ok(IntentActionsType::SpendAndVest(SpendAndVestFields {
-                vault_name: spend.name.to_owned(),
-                coin_type: actions[0].0[0].to_string(),
-                amount: spend.amount,
-                start: vest.start_timestamp,
-                end: vest.end_timestamp,
-                recipient: vest.recipient,
-            }))
-        },
-        _ => Err(anyhow!("Invalid intent type: {}", move_intent_type)),
+    fn try_from(value: &str) -> Result<Self> {
+        match value {
+            "460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config::ConfigMultisigIntent" => Ok(IntentType::ConfigMultisig),
+            "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ConfigDepsIntent" => Ok(IntentType::ConfigDeps),
+            "10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484::config::ToggleUnverifiedAllowedIntent" => Ok(IntentType::ToggleUnverifiedAllowed),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::access_control_intents::BorrowCapIntent" => Ok(IntentType::BorrowCap),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::DisableRulesIntent" => Ok(IntentType::DisableRules),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::UpdateMetadataIntent" => Ok(IntentType::UpdateMetadata),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::MintAndTransferIntent" => Ok(IntentType::MintAndTransfer),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::MintAndVestIntent" => Ok(IntentType::MintAndVest), 
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents::WithdrawAndBurnIntent" => Ok(IntentType::WithdrawAndBurn),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::kiosk_intents::TakeNftsIntent" => Ok(IntentType::TakeNfts),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::kiosk_intents::ListNftsIntent" => Ok(IntentType::ListNfts),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndTransferToVaultIntent" => Ok(IntentType::WithdrawAndTransferToVault),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndTransferIntent" => Ok(IntentType::WithdrawAndTransfer),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::owned_intents::WithdrawAndVestIntent" => Ok(IntentType::WithdrawAndVest),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::UpgradePackageIntent" => Ok(IntentType::UpgradePackage),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::package_upgrade_intents::RestrictPolicyIntent" => Ok(IntentType::RestrictPolicy),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::vault_intents::SpendAndTransferIntent" => Ok(IntentType::SpendAndTransfer),
+            "f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::vault_intents::SpendAndVestIntent" => Ok(IntentType::SpendAndVest),
+            _ => Err(anyhow!("Invalid intent type: {}", value)),
+        }
     }
 }
+
+impl IntentType {
+    pub fn count_repetitions(&self, actions: &[(Vec<TypeTag>, Vec<u8>)]) -> Result<usize> {
+        match self {
+            IntentType::ConfigMultisig => Ok(1),
+            IntentType::ConfigDeps => Ok(1),
+            IntentType::ToggleUnverifiedAllowed => Ok(1),
+            IntentType::BorrowCap => Ok(1),
+            IntentType::DisableRules => Ok(1),
+            IntentType::UpdateMetadata => Ok(1),
+            IntentType::MintAndTransfer => Ok(actions.len() / 2),
+            IntentType::MintAndVest => Ok(2),
+            IntentType::WithdrawAndBurn => Ok(2),
+            IntentType::TakeNfts => Ok(actions.len()),
+            IntentType::ListNfts => Ok(actions.len()),
+            IntentType::WithdrawAndTransferToVault => Ok(2),
+            IntentType::WithdrawAndTransfer => Ok(actions.len() / 2),
+            IntentType::WithdrawAndVest => Ok(2),
+            IntentType::UpgradePackage => Ok(1),
+            IntentType::RestrictPolicy => Ok(1),
+            IntentType::SpendAndTransfer => Ok(actions.len() / 2),
+            IntentType::SpendAndVest => Ok(2),
+        }
+    }
+    
+    pub fn deserialize_actions(&self, actions: &[(Vec<TypeTag>, Vec<u8>)]) -> Result<IntentActionsType> {
+        match self {
+            IntentType::ConfigMultisig => {
+                let action: am::config::ConfigMultisigAction = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::ConfigMultisig(ConfigMultisigFields {
+                    global: action.config.global,
+                    members: action.config.members.iter().map(|member| (member.addr, member.weight, member.roles.contents.iter().map(|role| role.to_string()).collect())).collect(),
+                    roles: action.config.roles.iter().map(|role| (role.name.to_string(), role.threshold)).collect(),
+                }))
+            },
+            IntentType::ConfigDeps => {
+                let action: ap::config::ConfigDepsAction = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::ConfigDeps(ConfigDepsFields {
+                    deps: action.deps.iter().map(|dep| (dep.name.to_owned(), dep.addr, dep.version)).collect(),
+                }))
+            },
+            IntentType::ToggleUnverifiedAllowed => {
+                let _action: ap::config::ToggleUnverifiedAllowedAction = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::ToggleUnverifiedAllowed(ToggleUnverifiedAllowedFields {}))
+            },
+            IntentType::BorrowCap => {
+                let _action: aa::access_control::BorrowAction<()> = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::BorrowCap(BorrowCapFields {
+                    cap_type: actions[0].0[0].to_string(),
+                }))
+            },
+            IntentType::DisableRules => {
+                let action: aa::currency::DisableAction<()> = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::DisableRules(DisableRulesFields {
+                    coin_type: actions[0].0[0].to_string(),
+                    mint: action.mint,
+                    burn: action.burn,
+                    update_symbol: action.update_symbol,
+                    update_name: action.update_name,
+                    update_description: action.update_description,
+                    update_icon: action.update_icon,
+                }))
+            },
+            IntentType::UpdateMetadata => {
+                let action: aa::currency::UpdateAction<()> = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::UpdateMetadata(UpdateMetadataFields {
+                    coin_type: actions[0].0[0].to_string(),
+                    new_name: action.name,
+                    new_symbol: action.symbol,
+                    new_description: action.description,
+                    new_icon_url: action.icon_url,
+                }))
+            },
+            IntentType::MintAndTransfer => {
+                let mut transfers = Vec::new();
+                for chunk in actions.chunks(2) {
+                    let mint: aa::currency::MintAction<()> = bcs::from_bytes(&chunk[0].1)?;
+                    let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
+                    transfers.push((mint.amount, transfer.recipient));
+                }
+    
+                Ok(IntentActionsType::MintAndTransfer(MintAndTransferFields { 
+                    coin_type: actions[0].0[0].to_string(), 
+                    transfers 
+                }))
+            },
+            IntentType::MintAndVest => {
+                let mint: aa::currency::MintAction<()> = bcs::from_bytes(&actions[0].1)?;
+                let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
+    
+                Ok(IntentActionsType::MintAndVest(MintAndVestFields {
+                    coin_type: actions[0].0[0].to_string(),
+                    amount: mint.amount,
+                    start: vest.start_timestamp,
+                    end: vest.end_timestamp,
+                    recipient: vest.recipient,
+                }))
+            },
+            IntentType::WithdrawAndBurn => {
+                let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
+                let burn: aa::currency::BurnAction<()> = bcs::from_bytes(&actions[1].1)?;
+    
+                Ok(IntentActionsType::WithdrawAndBurn(WithdrawAndBurnFields {
+                    coin_type: actions[1].0[0].to_string(),
+                    coin_id: withdraw.object_id.into(),
+                    amount: burn.amount,
+                }))
+            },
+            IntentType::TakeNfts => {
+                let (mut kiosk_name, mut recipient) = (String::new(), Address::ZERO);
+                let mut nft_ids = Vec::new();
+                for action in actions {
+                    let take: aa::kiosk::TakeAction = bcs::from_bytes(&action.1)?;
+                    if kiosk_name.is_empty() {
+                        kiosk_name = take.name.to_owned();
+                    }
+                    if recipient == Address::ZERO {
+                        recipient = take.recipient;
+                    }
+                    nft_ids.push(take.nft_id.into());
+                }
+                
+                Ok(IntentActionsType::TakeNfts(TakeNftsFields {
+                    kiosk_name,
+                    nft_ids,
+                    recipient,
+                }))
+            },
+            IntentType::ListNfts => {
+                let mut kiosk_name = String::new();
+                let mut listings = Vec::new();
+                for action in actions {
+                    let list: aa::kiosk::ListAction = bcs::from_bytes(&action.1)?;
+                    if kiosk_name.is_empty() {
+                        kiosk_name = list.name.to_owned();
+                    }
+                    listings.push((list.nft_id.into(), list.price));
+                }
+                
+                Ok(IntentActionsType::ListNfts(ListNftsFields {
+                    kiosk_name,
+                    listings,
+                }))
+            },
+            IntentType::WithdrawAndTransferToVault => {
+                let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
+                let deposit: aa::vault::DepositAction<()> = bcs::from_bytes(&actions[1].1)?;
+    
+                Ok(IntentActionsType::WithdrawAndTransferToVault(WithdrawAndTransferToVaultFields { 
+                    coin_type: actions[0].0[0].to_string(), 
+                    coin_id: withdraw.object_id.into(),
+                    coin_amount: deposit.amount,
+                    vault_name: deposit.name.to_owned(),
+                }))
+            },
+            IntentType::WithdrawAndTransfer => {
+                let mut transfers = Vec::new();
+                for chunk in actions.chunks(2) {
+                    let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&chunk[0].1)?;
+                    let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
+                    transfers.push((withdraw.object_id.into(), transfer.recipient));
+                }
+    
+                Ok(IntentActionsType::WithdrawAndTransfer(WithdrawAndTransferFields { 
+                    transfers
+                }))
+            },
+            IntentType::WithdrawAndVest => {
+                let withdraw: ap::owned::WithdrawAction = bcs::from_bytes(&actions[0].1)?;
+                let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
+    
+                Ok(IntentActionsType::WithdrawAndVest(WithdrawAndVestFields {
+                    coin_id: withdraw.object_id.into(),
+                    start: vest.start_timestamp,
+                    end: vest.end_timestamp,
+                    recipient: vest.recipient,
+                }))
+            },
+            IntentType::UpgradePackage => {
+                let upgrade: aa::package_upgrade::UpgradeAction = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::UpgradePackage(UpgradePackageFields {
+                    package_name: upgrade.name.to_owned(),
+                    digest: upgrade.digest.to_vec(),
+                }))
+            },
+            IntentType::RestrictPolicy => {
+                let restrict: aa::package_upgrade::RestrictAction = bcs::from_bytes(&actions[0].1)?;
+                Ok(IntentActionsType::RestrictPolicy(RestrictPolicyFields {
+                    package_name: restrict.name.to_owned(),
+                    policy: Policy::try_from(restrict.policy)?,
+                }))
+            },
+            IntentType::SpendAndTransfer => {
+                let mut vault_name = String::new();
+                let mut transfers = Vec::new();
+                for chunk in actions.chunks(2) {
+                    let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&chunk[0].1)?;
+                    let transfer: aa::transfer::TransferAction = bcs::from_bytes(&chunk[1].1)?;
+                    if vault_name.is_empty() {
+                        vault_name = spend.name.to_owned();
+                    }
+                    transfers.push((spend.amount, transfer.recipient));
+                }
+    
+                Ok(IntentActionsType::SpendAndTransfer(SpendAndTransferFields { 
+                    vault_name,
+                    coin_type: actions[0].0[0].to_string(),
+                    transfers,
+                }))
+            },
+            IntentType::SpendAndVest => {
+                let spend: aa::vault::SpendAction<()> = bcs::from_bytes(&actions[0].1)?;
+                let vest: aa::vesting::VestAction = bcs::from_bytes(&actions[1].1)?;
+    
+                Ok(IntentActionsType::SpendAndVest(SpendAndVestFields {
+                    vault_name: spend.name.to_owned(),
+                    coin_type: actions[0].0[0].to_string(),
+                    amount: spend.amount,
+                    start: vest.start_timestamp,
+                    end: vest.end_timestamp,
+                    recipient: vest.recipient,
+                }))
+            },
+        }
+    }
+}
+

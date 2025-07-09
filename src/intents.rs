@@ -5,7 +5,7 @@ use std::sync::Arc;
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, TypeTag};
 
-use crate::actions::{deserialize_actions, IntentActionsType};
+use crate::actions::{IntentType, IntentActionsType};
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::utils;
@@ -88,6 +88,7 @@ impl Intents {
     pub fn get_intent(&self, key: &str) -> Option<&Intent> {
         self.intents.get(key)
     }
+
 }
 
 impl fmt::Display for Intents {
@@ -125,7 +126,8 @@ impl Intent {
             }
         }
 
-        deserialize_actions(&self.type_, &df_types_with_bcs)
+        let intent_type = IntentType::try_from(self.type_.as_str())?;
+        intent_type.deserialize_actions(&df_types_with_bcs)
     }
 }
 
