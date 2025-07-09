@@ -91,6 +91,9 @@ impl Intents {
         self.intents.get(key)
     }
 
+    pub fn get_intent_mut(&mut self, key: &str) -> Option<&mut Intent> {
+        self.intents.get_mut(key)
+    }
 }
 
 impl fmt::Display for Intents {

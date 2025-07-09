@@ -152,7 +152,7 @@ define_args_struct!(WithdrawAndTransferToVaultArgs {
 });
 
 define_args_struct!(WithdrawAndTransferArgs {
-    object_ids: Vec<Address>,
+    object_ids: Vec<ObjectId>,
     recipients: Vec<Address>,
 });
 
