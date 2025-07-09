@@ -402,7 +402,7 @@ impl MultisigClient {
         |builder, executable, multisig| am::config::execute_config_multisig(
             builder, executable, multisig
         ),
-        |builder, expired| am::config::delete_config_multisig(builder, expired),
+        |builder, expired, _| am::config::delete_config_multisig(builder, expired),
     );
 
     define_intent_interface!(
@@ -425,7 +425,7 @@ impl MultisigClient {
             am::multisig::Multisig,
             am::multisig::Approvals,
         >(builder, executable, multisig),
-        |builder, expired| ap::config::delete_config_deps(builder, expired),
+        |builder, expired, _| ap::config::delete_config_deps(builder, expired),
     );
 
     define_intent_interface!(
@@ -441,7 +441,7 @@ impl MultisigClient {
             am::multisig::Multisig,
             am::multisig::Approvals,
         >(builder, executable, multisig),
-        |builder, expired| ap::config::delete_toggle_unverified_allowed(builder, expired),
+        |builder, expired, _| ap::config::delete_toggle_unverified_allowed(builder, expired),
     );
 
     define_request_intent!(
@@ -542,7 +542,7 @@ impl MultisigClient {
 
     define_delete_intent!(
         delete_borrow_cap,
-        |builder: &mut TransactionBuilder, expired: Argument| {
+        |builder: &mut TransactionBuilder, expired: Argument, _| {
             aa::access_control::delete_borrow::<CapType>(builder, expired.into());
             aa::access_control::delete_return::<CapType>(builder, expired.into());
         },
@@ -561,7 +561,7 @@ impl MultisigClient {
         |builder: &mut TransactionBuilder, executable, multisig| {
             aa::currency_intents::execute_disable_rules::<_, _, CoinType>(builder, executable, multisig);
         },
-        |builder: &mut TransactionBuilder, expired| {
+        |builder: &mut TransactionBuilder, expired, _| {
             aa::currency::delete_disable::<CoinType>(builder, expired);
         },
         CoinType,
@@ -628,7 +628,7 @@ impl MultisigClient {
 
     define_delete_intent!(
         delete_update_metadata,
-        |builder: &mut TransactionBuilder, expired: Argument| {
+        |builder: &mut TransactionBuilder, expired: Argument, _| {
             aa::currency::delete_update::<CoinType>(builder, expired.into());
         },
         CoinType,
@@ -648,7 +648,7 @@ impl MultisigClient {
                 builder, executable, multisig
             )
         },
-        |builder: &mut TransactionBuilder, expired: Argument| {
+        |builder: &mut TransactionBuilder, expired: Argument, _| {
             aa::currency::delete_mint::<CoinType>(builder, expired.into());
             aa::transfer::delete_transfer(builder, expired.into());
         },
@@ -669,7 +669,7 @@ impl MultisigClient {
                 builder, executable, multisig
             )
         },
-        |builder: &mut TransactionBuilder, expired: Argument| {
+        |builder: &mut TransactionBuilder, expired: Argument, _| {
             aa::currency::delete_mint::<CoinType>(builder, expired.into());
             aa::vesting::delete_vest(builder, expired.into());
         },
@@ -743,38 +743,14 @@ impl MultisigClient {
         Ok(())
     }
 
-    pub async fn delete_withdraw_and_burn<CoinType: MoveType>(
-        &self,
-        builder: &mut TransactionBuilder,
-        intent_key: &str,
-    ) -> Result<()> {
-        let mut ms_arg = self.multisig_arg(builder).await?;
-        let clock_arg = self.clock_arg(builder).await?;
-        let key_arg = self.key_arg(builder, intent_key)?;
-
-        let intent = self.try_get_intent(intent_key)?;
-        let current_timestamp = self.clock_timestamp().await?;
-        
-        let mut expired = if current_timestamp > intent.expiration_time {
-            ap::account::delete_expired_intent::<
-                am::multisig::Multisig,
-                am::multisig::Approvals,
-            >(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow())
-        } else if intent.execution_times.is_empty() {
-            ap::account::destroy_empty_intent::<
-                am::multisig::Multisig,
-                am::multisig::Approvals,
-            >(builder, ms_arg.borrow_mut(), key_arg)
-        } else {
-            return Err(anyhow!("Intent cannot be deleted"));
-        };
-
-        ap::owned::delete_withdraw(builder, expired.borrow_mut(), ms_arg.borrow_mut());
-        aa::currency::delete_burn::<CoinType>(builder, expired.borrow_mut());
-        ap::intents::destroy_empty_expired(builder, expired);
-
-        Ok(())
-    }
+    define_delete_intent!(
+        delete_withdraw_and_burn,
+        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
+            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
+            aa::currency::delete_burn::<CoinType>(builder, expired.into());
+        },
+        CoinType,
+    );
 
     // === Getters ===
 
@@ -1090,7 +1066,7 @@ macro_rules! define_execute_intent {
                 >(builder, ms_arg.borrow_mut(), key_arg);
     
                 for _ in 0..repeat {
-                    $delete_calls(builder, expired.borrow_mut().into());
+                    $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
                 }
                 ap::intents::destroy_empty_expired(builder, expired);
             }
@@ -1135,7 +1111,7 @@ macro_rules! define_delete_intent {
             };
 
             for _ in 0..repeat {
-                $delete_calls(builder, expired.borrow_mut().into());
+                $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
             }
             ap::intents::destroy_empty_expired(builder, expired);
 
