@@ -28,7 +28,8 @@ pub struct Intent {
     pub expiration_time: u64,
     pub role: String,
     pub actions_bag_id: Address,
-    pub actions_bcs: Vec<Vec<u8>>,
+    pub actions_types_bcs: Vec<(Vec<TypeTag>, Vec<u8>)>,
+    pub actions_args: Option<IntentActionsType>,
     pub outcome: Approvals,
 }
 
@@ -71,7 +72,8 @@ impl Intents {
                         expiration_time: intent.expiration_time,
                         role: intent.role,
                         actions_bag_id: intent.actions.id.into(),
-                        actions_bcs: Vec::new(),
+                        actions_types_bcs: Vec::new(),
+                        actions_args: None,
                         outcome: Approvals {
                             total_weight: intent.outcome.total_weight,
                             role_weight: intent.outcome.role_weight,
@@ -112,22 +114,32 @@ impl fmt::Debug for Intents {
 }
 
 impl Intent {
-    pub async fn get_actions_args(&self) -> Result<IntentActionsType> {
-        let mut df_types_with_bcs = Vec::new();
-        let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.actions_bag_id).await?;
-
-        for df_output in df_outputs {
-            if let Some(value) = &df_output.value {
-                let type_params = match &value.0 {
-                    TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
-                    _ => vec![],
-                };
-                df_types_with_bcs.push((type_params, value.1.clone())); // generics + contents bcs
+    pub async fn get_actions_args(&mut self) -> Result<&IntentActionsType> {
+        if self.actions_args.is_none() {
+            let mut df_types_with_bcs = Vec::new();
+            let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.actions_bag_id).await?;
+    
+            for df_output in df_outputs {
+                if let Some(value) = &df_output.value {
+                    let type_params = match &value.0 {
+                        TypeTag::Struct(struct_tag) => struct_tag.type_params.clone(),
+                        _ => vec![],
+                    };
+                    df_types_with_bcs.push((type_params, value.1.clone())); // generics + contents bcs
+                }
             }
+            self.actions_types_bcs = df_types_with_bcs;
+    
+            let intent_type = IntentType::try_from(self.type_.as_str())?;
+            self.actions_args = Some(intent_type.deserialize_actions(&self.actions_types_bcs)?);
         }
+        Ok(self.actions_args.as_ref().unwrap())
+    }
 
+    pub async fn get_executions_count(&mut self) -> Result<usize> {
+        let _ = self.get_actions_args().await?; // fetch actions args
         let intent_type = IntentType::try_from(self.type_.as_str())?;
-        intent_type.deserialize_actions(&df_types_with_bcs)
+        Ok(intent_type.count_repetitions(&self.actions_types_bcs)?)
     }
 }
 
@@ -150,7 +162,7 @@ impl fmt::Debug for Intent {
             .field("expiration_time", &self.expiration_time)
             .field("role", &self.role)
             .field("actions_bag_id", &self.actions_bag_id)
-            .field("actions_bcs", &self.actions_bcs)
+            .field("actions_types_bcs", &self.actions_types_bcs)
             .field("outcome", &self.outcome)
             .finish()
     }
