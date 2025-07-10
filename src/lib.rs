@@ -1,32 +1,20 @@
-pub mod actions;
-pub mod dynamic_fields;
+pub mod assets;
 pub mod intents;
 pub mod move_binding;
 pub mod multisig;
-pub mod owned_objects;
-pub mod params;
 pub mod utils;
 
-use anyhow::{anyhow, Ok, Result};
-use move_types::functions::Arg;
-use move_types::{Key, MoveType};
 use std::sync::Arc;
+use anyhow::{anyhow, Ok, Result};
+use move_types::{Key, MoveType, functions::Arg};
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, ObjectData, ObjectId};
-use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
-use sui_transaction_builder::{Function, Serialized};
+use sui_transaction_builder::{unresolved::Input, TransactionBuilder, Function, Serialized};
 
-use crate::actions::IntentActions;
-use crate::dynamic_fields::DynamicFields;
-use crate::intents::{Intent, Intents};
-use crate::move_binding::account_actions as aa;
-use crate::move_binding::account_extensions as ae;
-use crate::move_binding::account_multisig as am;
-use crate::move_binding::account_protocol as ap;
-use crate::move_binding::sui;
+use crate::move_binding::{account_actions as aa, account_extensions as ae, account_multisig as am, account_protocol as ap, sui};
+use crate::intents::{actions::IntentActions, params::{self, ParamsArgs}, intents::{Intent, Intents}};
+use crate::assets::{dynamic_fields::DynamicFields, owned_objects::OwnedObjects};
 use crate::multisig::Multisig;
-use crate::owned_objects::OwnedObjects;
-use crate::params::ParamsArgs;
 
 // TODO: MultisigCreateBuilder
 // TODO: User

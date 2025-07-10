@@ -7,7 +7,7 @@ use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
 use account_multisig_sdk::{
     define_move_type,
-    params::ParamsArgs,
+    intents::params::ParamsArgs,
     MultisigClient,
 };
 

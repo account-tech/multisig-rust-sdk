@@ -6,11 +6,9 @@ use std::fmt;
 use sui_graphql_client::Client;
 use sui_sdk_types::{ObjectData, Address};
 
-use crate::move_binding::account_protocol as ap;
-use crate::move_binding::account_multisig as am;
-use crate::intents::Intents;
-use crate::owned_objects::OwnedObjects;
-use crate::dynamic_fields::DynamicFields;
+use crate::move_binding::{account_protocol as ap, account_multisig as am};
+use crate::assets::{dynamic_fields::DynamicFields, owned_objects::OwnedObjects};
+use crate::intents::intents::Intents;
 use crate::utils;
 use crate::FEE_OBJECT;
 
