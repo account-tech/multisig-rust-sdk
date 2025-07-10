@@ -1,10 +1,6 @@
-use anyhow::Result;
 use move_types::{functions::Arg, ObjectId};
-use sui_graphql_client::Client;
-use sui_sdk_types::{Address, Argument};
+use sui_sdk_types::Address;
 use sui_transaction_builder::{Serialized, TransactionBuilder};
-
-use crate::{utils::get_object_as_input, EXTENSIONS_OBJECT};
 
 macro_rules! define_args_struct {
     (
@@ -72,33 +68,11 @@ define_args_struct!(ConfigMultisigArgs {
     role_thresholds: Vec<u64>,
 });
 
-pub struct ConfigDepsArgs {
-    pub extensions: Argument,
-    pub names: Arg<Vec<String>>,
-    pub addresses: Arg<Vec<Address>>,
-    pub versions: Arg<Vec<u64>>,
-}
-
-impl ConfigDepsArgs {
-    pub async fn new(
-        sui_client: &Client,
-        builder: &mut TransactionBuilder,
-        names: Vec<String>,
-        addresses: Vec<Address>,
-        versions: Vec<u64>,
-    ) -> Result<Self> {
-        let extensions_input =
-            get_object_as_input(sui_client, EXTENSIONS_OBJECT.parse().unwrap()).await?;
-        let extensions_argument = builder.input(extensions_input.by_ref());
-
-        Ok(Self {
-            extensions: extensions_argument,
-            names: builder.input(Serialized(&names)).into(),
-            addresses: builder.input(Serialized(&addresses)).into(),
-            versions: builder.input(Serialized(&versions)).into(),
-        })
-    }
-}
+define_args_struct!(ConfigDepsArgs {
+    names: Vec<String>,
+    addresses: Vec<Address>,
+    versions: Vec<u64>,
+});
 
 define_args_struct!(DisableRulesArgs {
     mint: bool,
@@ -157,7 +131,7 @@ define_args_struct!(WithdrawAndTransferArgs {
 });
 
 define_args_struct!(WithdrawAndVestArgs {
-    coin_id: Address,
+    coin_id: ObjectId,
     start_timestamp: u64,
     end_timestamp: u64,
     recipient: Address,

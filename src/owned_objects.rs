@@ -70,6 +70,20 @@ impl OwnedObjects {
 
         Ok(())
     }
+
+    pub fn get_type_by_id(&self, id: Address) -> Option<String> {
+        for coin in &self.coins {
+            if coin.id == id {
+                return Some(coin.type_.clone());
+            }
+        }
+        for object in &self.objects {
+            if object.id == id {
+                return Some(object.type_.clone());
+            }
+        }
+        None
+    }
 }
 
 impl fmt::Debug for OwnedObjects {

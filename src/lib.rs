@@ -387,7 +387,12 @@ impl MultisigClient {
         intent_args: ParamsArgs,
         actions_args: params::ConfigMultisigArgs,
     ) -> Result<()> {
-        let (mut multisig, auth, params, outcome) = self.prepare_request(builder, intent_args).await?;
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
 
         am::config::request_config_multisig(
             builder,
@@ -421,11 +426,11 @@ impl MultisigClient {
         am::config::execute_config_multisig(builder, executable.borrow_mut(), multisig.borrow_mut());
 
         if is_last_execution {
-            let key_arg = self.key_arg(builder, intent_key)?;
+            let key = self.key_arg(builder, intent_key)?;
             let mut expired = ap::account::destroy_empty_intent::<
                 am::multisig::Multisig,
                 am::multisig::Approvals,
-            >(builder, multisig.borrow_mut(), key_arg);
+            >(builder, multisig.borrow_mut(), key);
 
             am::config::delete_config_multisig(builder, expired.borrow_mut());
             ap::intents::destroy_empty_expired(builder, expired);
@@ -450,125 +455,196 @@ impl MultisigClient {
         Ok(())
     }
 
-    define_intent_interface!(
-        config_multisig,
-        params::ConfigMultisigArgs,
-        |builder, auth, multisig, params, outcome, args: params::ConfigMultisigArgs| {
-            am::config::request_config_multisig(
-                builder,
-                auth,
-                multisig,
-                params,
-                outcome,
-                args.addresses,
-                args.weights,
-                args.roles,
-                args.global,
-                args.role_names,
-                args.role_thresholds,
-            )
-        },
-        |builder, executable, multisig| am::config::execute_config_multisig(
-            builder, executable, multisig
-        ),
-        |builder, expired, _| am::config::delete_config_multisig(builder, expired),
-    );
-
-    define_intent_interface!(
-        config_deps,
-        params::ConfigDepsArgs,
-        |builder, auth, multisig, params, outcome, args: params::ConfigDepsArgs| {
-            ap::config::request_config_deps::<am::multisig::Multisig, am::multisig::Approvals>(
-                builder,
-                auth,
-                multisig,
-                params,
-                outcome,
-                args.extensions.into(),
-                args.names,
-                args.addresses,
-                args.versions,
-            )
-        },
-        |builder, executable, multisig| ap::config::execute_config_deps::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-        >(builder, executable, multisig),
-        |builder, expired, _| ap::config::delete_config_deps(builder, expired),
-    );
-
-    define_intent_interface!(
-        toggle_unverified_allowed,
-        (),
-        |builder, auth, multisig, params, outcome, _| {
-            ap::config::request_toggle_unverified_allowed::<
-                am::multisig::Multisig,
-                am::multisig::Approvals,
-            >(builder, auth, multisig, params, outcome)
-        },
-        |builder, executable, multisig| ap::config::execute_toggle_unverified_allowed::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-        >(builder, executable, multisig),
-        |builder, expired, _| ap::config::delete_toggle_unverified_allowed(builder, expired),
-    );
-
-    define_request_intent!(
-        request_borrow_cap,
-        (),
-        |builder, auth, multisig, params, outcome, _| {
-            aa::access_control_intents::request_borrow_cap::<
-                am::multisig::Multisig,
-                am::multisig::Approvals,
-                CapType,
-            >(builder, auth, multisig, params, outcome)
-        },
-        CapType,
-    );
-    // define_execute_intent!(
-    //     execute_borrow_cap,
-    //     |builder, executable, ms_arg, _| {
-    //         aa::access_control_intents::execute_borrow_cap::<
-    //             am::multisig::Multisig,
-    //             am::multisig::Approvals,
-    //             CapObject,
-    //         >(builder, executable, ms_arg)
-    //     },
-    //     CapObject:Key,
-    // );
-
-    /// Use the borrow_and_return_cap! macro instead
-    pub async fn execute_borrow_cap<Cap: Key>(
+    pub async fn request_config_deps(
         &self,
         builder: &mut TransactionBuilder,
-        ms_arg: &mut Arg<ap::account::Account<am::multisig::Multisig>>,
-        clock_arg: &Arg<sui::clock::Clock>,
-        intent_key: &str,
-    ) -> Result<(
-        Arg<ap::executable::Executable<am::multisig::Approvals>>,
-        Arg<Cap>,
-    )> {
-        let key_arg = self.key_arg(builder, intent_key)?;
+        intent_args: ParamsArgs,
+        actions_args: params::ConfigDepsArgs,
+    ) -> Result<()> {
+        let extensions = self.extensions_arg(builder).await?;
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
 
-        let intent = self.try_get_intent(intent_key)?;
-        let current_timestamp = self.clock_timestamp().await?;
-        if intent.execution_times.is_empty() || current_timestamp < *intent.execution_times.first().unwrap() {
-            return Err(anyhow!("Intent cannot be executed"));
+        ap::config::request_config_deps(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            extensions.borrow(),
+            actions_args.names,
+            actions_args.addresses,
+            actions_args.versions,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_config_deps(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        ap::config::execute_config_deps(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::config::delete_config_deps(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
         }
 
-        let mut executable =
-            am::multisig::execute_intent(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow());
+        Ok(())
+    }
+
+    pub async fn delete_config_deps(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::config::delete_config_deps(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_toggle_unverified_allowed(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        ap::config::request_toggle_unverified_allowed(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_toggle_unverified_allowed(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        ap::config::execute_toggle_unverified_allowed(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::config::delete_toggle_unverified_allowed(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_toggle_unverified_allowed(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::config::delete_toggle_unverified_allowed(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_borrow_cap<CapType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::access_control_intents::request_borrow_cap::<_, _, CapType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_borrow_cap<Cap: Key>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<(
+        Arg<ap::account::Account<am::multisig::Multisig>>,
+        Arg<ap::executable::Executable<am::multisig::Approvals>>,
+        Arg<Cap>,
+        bool,
+    )> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
 
         let cap = aa::access_control_intents::execute_borrow_cap(
             builder,
             executable.borrow_mut(),
-            ms_arg.borrow_mut(),
+            multisig.borrow_mut(),
         );
 
-        Ok((executable, cap))
+        Ok((multisig, executable, cap, is_last_execution))
     }
+    
     // Use the Cap between borrow and return
-    #[allow(clippy::too_many_arguments)]
     pub async fn execute_return_cap<Cap: Key>(
         &self,
         builder: &mut TransactionBuilder,
@@ -589,8 +665,7 @@ impl MultisigClient {
             executable,
         );
 
-        let intent = self.try_get_intent(intent_key)?;
-        if intent.execution_times.len() == 1 {
+        if self.try_get_intent(intent_key)?.execution_times.len() == 1 {
             let key_arg = self.key_arg(builder, intent_key)?;
             let mut expired = ap::account::destroy_empty_intent::<
                 am::multisig::Multisig,
@@ -605,217 +680,658 @@ impl MultisigClient {
 
         Ok(())
     }
-    define_delete_intent!(
-        delete_borrow_cap,
-        |builder: &mut TransactionBuilder, expired: Argument, _| {
-            aa::access_control::delete_borrow::<CapType>(builder, expired.into());
-            aa::access_control::delete_return::<CapType>(builder, expired.into());
-        },
-        CapType,
-    );
 
-    define_intent_interface!(
-        disable_rules,
-        params::DisableRulesArgs,
-        |builder, auth, multisig, params, outcome, args: params::DisableRulesArgs| {
-            aa::currency_intents::request_disable_rules::<_, _, CoinType>(
-                builder, auth, multisig, params, outcome, 
-                args.mint, args.burn, args.update_symbol, args.update_name, args.update_description, args.update_icon
-            );
-        },
-        |builder: &mut TransactionBuilder, executable, multisig| {
-            aa::currency_intents::execute_disable_rules::<_, _, CoinType>(builder, executable, multisig);
-        },
-        |builder: &mut TransactionBuilder, expired, _| {
-            aa::currency::delete_disable::<CoinType>(builder, expired);
-        },
-        CoinType,
-    );
+    pub async fn delete_borrow_cap<Cap: Key>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
 
-    define_request_intent!(
-        request_update_metadata,
-        params::UpdateMetadataArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::UpdateMetadataArgs| {
-            aa::currency_intents::request_update_metadata::<_, _, CoinType>(
-                builder, auth, multisig_input, params, outcome,
-                args.symbol, args.name, args.description, args.icon_url,
-            )
-        },
-        CoinType,
-    );
-    define_execute_intent_custom!(
-        execute_update_metadata,
-        [coin_metadata_id: Address],
-        async |ms_client: &MultisigClient, builder: &mut TransactionBuilder, executable, ms_arg, coin_metadata_id| {
-            let coin_metadata_arg = ms_client.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_id).await;
-            aa::currency_intents::execute_update_metadata(builder, executable, ms_arg, coin_metadata_arg.unwrap().borrow_mut());
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, _| {
-            aa::currency::delete_update::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
-    define_delete_intent!(
-        delete_update_metadata,
-        |builder: &mut TransactionBuilder, expired: Argument, _| {
-            aa::currency::delete_update::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
+        aa::access_control::delete_borrow::<Cap>(builder, expired.borrow_mut());
+        aa::access_control::delete_return::<Cap>(builder, expired.borrow_mut());
 
-    define_intent_interface!(
-        mint_and_transfer,
-        params::MintAndTransferArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::MintAndTransferArgs| {
-            aa::currency_intents::request_mint_and_transfer::<_, _, CoinType>(
-                builder, auth, multisig_input,
-                params, outcome, args.amounts, args.recipients,
-            )
-        },
-        |builder, executable, multisig| {
-            aa::currency_intents::execute_mint_and_transfer::<_, _, CoinType>(
-                builder, executable, multisig
-            )
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, _| {
-            aa::currency::delete_mint::<CoinType>(builder, expired.into());
-            aa::transfer::delete_transfer(builder, expired.into());
-        },
-        CoinType,
-    );
+        Ok(())
+    }
 
-    define_intent_interface!(
-        mint_and_vest,
-        params::MintAndVestArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::MintAndVestArgs| {
-            aa::currency_intents::request_mint_and_vest::<_, _, CoinType>(
-                builder, auth, multisig_input, params, outcome,
-                args.total_amount, args.start_timestamp, args.end_timestamp, args.recipient,
-            )
-        },
-        |builder, executable, multisig| {
-            aa::currency_intents::execute_mint_and_vest::<_, _, CoinType>(
-                builder, executable, multisig
-            )
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, _| {
-            aa::currency::delete_mint::<CoinType>(builder, expired.into());
-            aa::vesting::delete_vest(builder, expired.into());
-        },
-        CoinType,
-    );
+    pub async fn request_disable_rules<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::DisableRulesArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
 
-    define_request_intent!(
-        request_withdraw_and_burn,
-        params::WithdrawAndBurnArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::WithdrawAndBurnArgs| {
-            aa::currency_intents::request_withdraw_and_burn::<_, _, CoinType>(
-                builder, auth, multisig_input, params, outcome,
-                args.coin_id, args.amount,
-            )
-        },
-        CoinType,
-    );
-    define_execute_intent_custom!(
-        execute_withdraw_and_burn,
-        [coin_id: Address],
-        async |ms_client: &MultisigClient, builder: &mut TransactionBuilder, executable, ms_arg, coin_id| {
-            let input = ms_client.obj(coin_id).await.unwrap();
-            let arg: Arg<sui::transfer::Receiving<sui::coin::Coin<CoinType>>> = builder.input(input.with_receiving_kind()).into();
-            aa::currency_intents::execute_withdraw_and_burn::<_, _, CoinType>(
-                builder, executable, ms_arg, arg,
-            )
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::currency::delete_burn::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
-    define_delete_intent!(
-        delete_withdraw_and_burn,
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::currency::delete_burn::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
+        aa::currency_intents::request_disable_rules::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.mint,
+            actions_args.burn,
+            actions_args.update_symbol,
+            actions_args.update_name,
+            actions_args.update_description,
+            actions_args.update_icon,
+        );
 
-    define_request_intent!(
-        request_withdraw_and_transfer_to_vault,
-        params::WithdrawAndTransferToVaultArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::WithdrawAndTransferToVaultArgs| {
-            aa::owned_intents::request_withdraw_and_transfer_to_vault::<_, _, CoinType>(
-                builder, auth, multisig_input, params, outcome,
-                args.coin_id, args.coin_amount, args.vault_name,
-            )
-        },
-        CoinType,
-    );
-    define_execute_intent_custom!(
-        execute_withdraw_and_transfer_to_vault,
-        [coin_id: Address],
-        async |ms_client: &MultisigClient, builder: &mut TransactionBuilder, executable, ms_arg, coin_id| {
-            let input = ms_client.obj(coin_id).await.unwrap();
-            let arg: Arg<sui::transfer::Receiving<sui::coin::Coin<CoinType>>> = builder.input(input.with_receiving_kind()).into();
-            aa::owned_intents::execute_withdraw_and_transfer_to_vault::<_, _, CoinType>(
-                builder, executable, ms_arg, arg,
-            )
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::vault::delete_deposit::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
-    define_delete_intent!(
-        delete_withdraw_and_transfer_to_vault,
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::vault::delete_deposit::<CoinType>(builder, expired.into());
-        },
-        CoinType,
-    );
+        Ok(())
+    }
 
-    define_request_intent!(
-        request_withdraw_and_transfer,
-        params::WithdrawAndTransferArgs,
-        |builder, auth, multisig_input, params, outcome, args: params::WithdrawAndTransferArgs| {
-            aa::owned_intents::request_withdraw_and_transfer(
-                builder, auth, multisig_input, params, outcome,
-                args.object_ids, args.recipients,
-            )
-        },
-        CoinType,
-    );
-    define_execute_intent_custom!(
-        execute_withdraw_and_transfer,
-        [received_ids: Vec<ObjectId>],
-        async |ms_client: &MultisigClient, builder: &mut TransactionBuilder, executable: MutRef<'_, ap::executable::Executable<am::multisig::Approvals>>, ms_arg: MutRef<'_, ap::account::Account<am::multisig::Multisig>>, received_ids| {
-            let executable_arg: Argument = executable.into();
-            let ms_arg_arg: Argument = ms_arg.into();
-            for id in received_ids {
-                let addr = Address::from(id as ObjectId);
-                let input = ms_client.obj(addr).await.unwrap();
-                let obj: Arg<sui::transfer::Receiving<Obj>> = builder.input(input.with_receiving_kind()).into();
-                aa::owned_intents::execute_withdraw_and_transfer::<am::multisig::Multisig, am::multisig::Approvals, Obj>(
-                    builder, executable_arg.into(), ms_arg_arg.into(), obj,
-                )
+    pub async fn execute_disable_rules<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        aa::currency_intents::execute_disable_rules::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            aa::currency::delete_disable::<CoinType>(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_disable_rules<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::currency::delete_disable::<CoinType>(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_update_metadata<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::UpdateMetadataArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::currency_intents::request_update_metadata::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.symbol,
+            actions_args.name,
+            actions_args.description,
+            actions_args.icon_url,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_update_metadata<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+        coin_metadata_id: Address,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        let mut coin_metadata = self.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_id).await?;
+        aa::currency_intents::execute_update_metadata::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut(), coin_metadata.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            aa::currency::delete_update::<CoinType>(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_update_metadata<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::currency::delete_update::<CoinType>(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_mint_and_transfer<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::MintAndTransferArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::currency_intents::request_mint_and_transfer::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.amounts,
+            actions_args.recipients,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_mint_and_transfer<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        for _ in 0..executions_count {
+            aa::currency_intents::execute_mint_and_transfer::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+        }
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            for _ in 0..executions_count {
+                aa::currency::delete_mint::<CoinType>(builder, expired.borrow_mut());
+                aa::transfer::delete_transfer(builder, expired.borrow_mut());
             }
-        },
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::transfer::delete_transfer(builder, expired.into());
-        },
-        Obj:Key,
-    );
-    define_delete_intent!(
-        delete_withdraw_and_transfer,
-        |builder: &mut TransactionBuilder, expired: Argument, ms_arg| {
-            ap::owned::delete_withdraw(builder, expired.into(), ms_arg);
-            aa::transfer::delete_transfer(builder, expired.into());
-        },
-    );
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_mint_and_transfer<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        for _ in 0..executions_count {
+            aa::currency::delete_mint::<CoinType>(builder, expired.borrow_mut());
+            aa::transfer::delete_transfer(builder, expired.borrow_mut());
+        }
+
+        Ok(())
+    }
+
+    pub async fn request_mint_and_vest<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::MintAndVestArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::currency_intents::request_mint_and_vest::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.total_amount,
+            actions_args.start_timestamp,
+            actions_args.end_timestamp,
+            actions_args.recipient,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_mint_and_vest<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        aa::currency_intents::execute_mint_and_vest::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            aa::currency::delete_mint::<CoinType>(builder, expired.borrow_mut());
+            aa::vesting::delete_vest(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_mint_and_vest<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::currency::delete_mint::<CoinType>(builder, expired.borrow_mut());
+        aa::vesting::delete_vest(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_withdraw_and_burn<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::WithdrawAndBurnArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::currency_intents::request_withdraw_and_burn::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.coin_id,
+            actions_args.amount,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_withdraw_and_burn<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let coin_id = match actions_args {
+            IntentActions::WithdrawAndBurn(actions_args) => actions_args.coin_id,
+            _ => return Err(anyhow!("Intent {} is not a WithdrawAndBurn intent", intent_key)),
+        };
+
+        let receive_coin = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
+        aa::currency_intents::execute_withdraw_and_burn(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_coin);
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+            aa::currency::delete_burn::<CoinType>(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_withdraw_and_burn<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+        aa::currency::delete_burn::<CoinType>(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_withdraw_and_transfer_to_vault<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::WithdrawAndTransferToVaultArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::owned_intents::request_withdraw_and_transfer_to_vault::<_, _, CoinType>(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.coin_id,
+            actions_args.coin_amount,
+            actions_args.vault_name,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_withdraw_and_transfer_to_vault<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let coin_id = match actions_args {
+            IntentActions::WithdrawAndTransferToVault(actions_args) => actions_args.coin_id,
+            _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransferToVault intent", intent_key)),
+        };
+
+        let receive_coin = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
+        aa::owned_intents::execute_withdraw_and_transfer_to_vault(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_coin);
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+            aa::vault::delete_deposit::<CoinType>(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_withdraw_and_transfer_to_vault<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+        aa::vault::delete_deposit::<CoinType>(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_withdraw_and_transfer(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::WithdrawAndTransferArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::owned_intents::request_withdraw_and_transfer(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.object_ids,
+            actions_args.recipients,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_withdraw_and_transfer(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let transfers = match actions_args {
+            IntentActions::WithdrawAndTransfer(actions_args) => actions_args.transfers.clone(),
+            _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransfer intent", intent_key)),
+        };
+
+        for (id, _recipient) in transfers {
+            let receive_id = builder.input(self.obj(id).await?.with_receiving_kind());
+            let obj_type = self
+                .owned_objects()
+                .and_then(|o| o.get_type_by_id(id))
+                .ok_or(anyhow!("Object type not found"))?;
+
+            builder.move_call(
+                Function::new(
+                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                    "owned_intents".parse().unwrap(),
+                    "execute_withdraw_and_transfer".parse().unwrap(),
+                    vec![obj_type.parse().unwrap()],
+                ),
+                vec![executable.borrow_mut().into(), multisig.borrow_mut().into(), receive_id],
+            );
+        }
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            for _ in 0..executions_count {
+                ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+                aa::transfer::delete_transfer(builder, expired.borrow_mut());
+            }
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_withdraw_and_transfer(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+        aa::transfer::delete_transfer(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_withdraw_and_vest(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::WithdrawAndVestArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::owned_intents::request_withdraw_and_vest(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.coin_id,
+            actions_args.start_timestamp,
+            actions_args.end_timestamp,
+            actions_args.recipient,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_withdraw_and_vest<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let coin_id = match actions_args {
+            IntentActions::WithdrawAndVest(actions_args) => actions_args.coin_id,
+            _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransfer intent", intent_key)),
+        };
+        let receive_id = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
+        aa::owned_intents::execute_withdraw_and_vest(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_id);
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+            aa::vesting::delete_vest(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_withdraw_and_vest(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+        aa::vesting::delete_vest(builder, expired.borrow_mut());
+
+        Ok(())
+    }
 
     // === Getters ===
 
@@ -895,6 +1411,16 @@ impl MultisigClient {
     ) -> Result<Arg<Obj>> {
         let object_input = self.obj(id).await?;
         let object_arg = builder.input(object_input).into();
+        Ok(object_arg)
+    }
+
+    pub async fn receive_arg<Obj: MoveType + Key>(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Arg<sui::transfer::Receiving<Obj>>> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input.with_receiving_kind()).into();
         Ok(object_arg)
     }
 
@@ -1048,38 +1574,6 @@ impl MultisigClient {
     }
 }
 
-// helper for the BorrowCap intent
-#[macro_export]
-macro_rules! borrow_and_return_cap {
-    (
-        $multisig_client: expr,
-        $builder: expr,
-        $intent_key: expr,
-        $cap_obj: ty,
-        $use_cap: expr $(,)?
-    ) => {{
-        let mut ms_arg = $multisig_client.multisig_arg($builder).await?;
-        let clock_arg = $multisig_client.clock_arg($builder).await?;
-        
-        let (executable, cap) = $multisig_client.execute_borrow_cap::<$cap_obj>(
-            $builder,
-            &mut ms_arg,
-            &clock_arg,
-            $intent_key,
-        ).await?;
-
-        $use_cap($builder, cap.borrow());
-
-        $multisig_client.execute_return_cap::<$cap_obj>(
-            $builder,
-            &mut ms_arg,
-            executable,
-            cap,
-            $intent_key,
-        ).await?;
-    }};
-}
-
 #[macro_export]
 macro_rules! define_move_type {
     (
@@ -1144,246 +1638,246 @@ macro_rules! define_move_object {
     };
 }
 
-#[macro_export]
-macro_rules! define_request_intent {
-    (
-        $request_intent_name:ident,
-        $request_args_type:ty,
-        $request_call:expr,
-        $($generic_type:ident,)?
-    ) => {
-        pub async fn $request_intent_name$(<$generic_type: MoveType>)?(
-            &self,
-            builder: &mut TransactionBuilder,
-            params_args: ParamsArgs,
-            request_args: $request_args_type,
-        ) -> Result<()> {
-            let mut ms_arg = self.multisig_arg(builder).await?;
-            let clock_arg = self.clock_arg(builder).await?;
+// #[macro_export]
+// macro_rules! define_request_intent {
+//     (
+//         $request_intent_name:ident,
+//         $request_args_type:ty,
+//         $request_call:expr,
+//         $($generic_type:ident,)?
+//     ) => {
+//         pub async fn $request_intent_name$(<$generic_type: MoveType>)?(
+//             &self,
+//             builder: &mut TransactionBuilder,
+//             params_args: ParamsArgs,
+//             request_args: $request_args_type,
+//         ) -> Result<()> {
+//             let mut ms_arg = self.multisig_arg(builder).await?;
+//             let clock_arg = self.clock_arg(builder).await?;
 
-            let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-            let params = ap::intents::new_params(
-                builder,
-                params_args.key,
-                params_args.description,
-                params_args.execution_times,
-                params_args.expiration_time,
-                clock_arg.borrow(),
-            );
-            let outcome = am::multisig::empty_outcome(builder);
+//             let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+//             let params = ap::intents::new_params(
+//                 builder,
+//                 params_args.key,
+//                 params_args.description,
+//                 params_args.execution_times,
+//                 params_args.expiration_time,
+//                 clock_arg.borrow(),
+//             );
+//             let outcome = am::multisig::empty_outcome(builder);
 
-            $request_call(
-                builder,
-                auth,
-                ms_arg.borrow_mut(),
-                params,
-                outcome,
-                request_args,
-            );
-            Ok(())
-        }
-    };
-}
+//             $request_call(
+//                 builder,
+//                 auth,
+//                 ms_arg.borrow_mut(),
+//                 params,
+//                 outcome,
+//                 request_args,
+//             );
+//             Ok(())
+//         }
+//     };
+// }
 
-#[macro_export]
-macro_rules! define_execute_intent {
-    (
-        $execute_intent_name:ident,
-        $execute_call:expr,
-        $delete_calls:expr,
-        $($generic_type:ident $(:$trait_bound:path)?,)?
-    ) => {
-        pub async fn $execute_intent_name$(<$generic_type: MoveType + $($trait_bound)?>)?(
-            &mut self,
-            builder: &mut TransactionBuilder,
-            intent_key: &str,
-        ) -> Result<()> {
-            let mut ms_arg = self.multisig_arg(builder).await?;
-            let clock_arg = self.clock_arg(builder).await?;
-            let key_arg = self.key_arg(builder, intent_key)?;
+// #[macro_export]
+// macro_rules! define_execute_intent {
+//     (
+//         $execute_intent_name:ident,
+//         $execute_call:expr,
+//         $delete_calls:expr,
+//         $($generic_type:ident $(:$trait_bound:path)?,)?
+//     ) => {
+//         pub async fn $execute_intent_name$(<$generic_type: MoveType + $($trait_bound)?>)?(
+//             &mut self,
+//             builder: &mut TransactionBuilder,
+//             intent_key: &str,
+//         ) -> Result<()> {
+//             let mut ms_arg = self.multisig_arg(builder).await?;
+//             let clock_arg = self.clock_arg(builder).await?;
+//             let key_arg = self.key_arg(builder, intent_key)?;
             
-            let repeat = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
+//             let repeat = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
 
-            let intent = self.try_get_intent(intent_key)?;
-            let current_timestamp = self.clock_timestamp().await?;
-            if current_timestamp < *intent.execution_times.first().unwrap() {
-                return Err(anyhow!("Intent cannot be executed"));
-            }
+//             let intent = self.try_get_intent(intent_key)?;
+//             let current_timestamp = self.clock_timestamp().await?;
+//             if current_timestamp < *intent.execution_times.first().unwrap() {
+//                 return Err(anyhow!("Intent cannot be executed"));
+//             }
             
-            let mut executable = am::multisig::execute_intent(
-                builder,
-                ms_arg.borrow_mut(),
-                key_arg,
-                clock_arg.borrow(),
-            );
+//             let mut executable = am::multisig::execute_intent(
+//                 builder,
+//                 ms_arg.borrow_mut(),
+//                 key_arg,
+//                 clock_arg.borrow(),
+//             );
             
-            for _ in 0..repeat {
-                $execute_call(builder, executable.borrow_mut(), ms_arg.borrow_mut());
-            }
+//             for _ in 0..repeat {
+//                 $execute_call(builder, executable.borrow_mut(), ms_arg.borrow_mut());
+//             }
             
-            ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
-                builder,
-                ms_arg.borrow_mut(),
-                executable,
-            );
+//             ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
+//                 builder,
+//                 ms_arg.borrow_mut(),
+//                 executable,
+//             );
             
-            if intent.execution_times.len() == 1 {
-                let key_arg = self.key_arg(builder, intent_key)?;
-                let mut expired = ap::account::destroy_empty_intent::<
-                    am::multisig::Multisig,
-                    am::multisig::Approvals,
-                >(builder, ms_arg.borrow_mut(), key_arg);
+//             if intent.execution_times.len() == 1 {
+//                 let key_arg = self.key_arg(builder, intent_key)?;
+//                 let mut expired = ap::account::destroy_empty_intent::<
+//                     am::multisig::Multisig,
+//                     am::multisig::Approvals,
+//                 >(builder, ms_arg.borrow_mut(), key_arg);
     
-                for _ in 0..repeat {
-                    $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
-                }
-                ap::intents::destroy_empty_expired(builder, expired);
-            }
+//                 for _ in 0..repeat {
+//                     $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
+//                 }
+//                 ap::intents::destroy_empty_expired(builder, expired);
+//             }
 
-            Ok(())
-        }
-    };
-}
+//             Ok(())
+//         }
+//     };
+// }
 
-#[macro_export]
-macro_rules! define_execute_intent_custom {
-    (
-        $execute_intent_name:ident,
-        [$($additional_arg:ident: $additional_type:ty $(,)?)*],
-        $execute_call:expr,
-        $delete_calls:expr,
-        $($generic_type:ident $(:$trait_bound:path)?,)?
-    ) => {
-        pub async fn $execute_intent_name$(<$generic_type: MoveType + $($trait_bound)?>)?(
-            &mut self,
-            builder: &mut TransactionBuilder,
-            intent_key: &str,
-            $($additional_arg: $additional_type,)*
-        ) -> Result<()> {
-            let mut ms_arg = self.multisig_arg(builder).await?;
-            let clock_arg = self.clock_arg(builder).await?;
-            let key_arg = self.key_arg(builder, intent_key)?;
+// #[macro_export]
+// macro_rules! define_execute_intent_custom {
+//     (
+//         $execute_intent_name:ident,
+//         [$($additional_arg:ident: $additional_type:ty $(,)?)*],
+//         $execute_call:expr,
+//         $delete_calls:expr,
+//         $($generic_type:ident $(:$trait_bound:path)?,)?
+//     ) => {
+//         pub async fn $execute_intent_name$(<$generic_type: MoveType + $($trait_bound)?>)?(
+//             &mut self,
+//             builder: &mut TransactionBuilder,
+//             intent_key: &str,
+//             $($additional_arg: $additional_type,)*
+//         ) -> Result<()> {
+//             let mut ms_arg = self.multisig_arg(builder).await?;
+//             let clock_arg = self.clock_arg(builder).await?;
+//             let key_arg = self.key_arg(builder, intent_key)?;
             
-            let repeat = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
+//             let repeat = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
 
-            let intent = self.try_get_intent(intent_key)?;
-            let current_timestamp = self.clock_timestamp().await?;
-            if current_timestamp < *intent.execution_times.first().unwrap() {
-                return Err(anyhow!("Intent cannot be executed"));
-            }
+//             let intent = self.try_get_intent(intent_key)?;
+//             let current_timestamp = self.clock_timestamp().await?;
+//             if current_timestamp < *intent.execution_times.first().unwrap() {
+//                 return Err(anyhow!("Intent cannot be executed"));
+//             }
             
-            let mut executable = am::multisig::execute_intent(
-                builder,
-                ms_arg.borrow_mut(),
-                key_arg,
-                clock_arg.borrow(),
-            );
+//             let mut executable = am::multisig::execute_intent(
+//                 builder,
+//                 ms_arg.borrow_mut(),
+//                 key_arg,
+//                 clock_arg.borrow(),
+//             );
             
-            // for _ in 0..repeat {
-            $execute_call(self, builder, executable.borrow_mut(), ms_arg.borrow_mut(), $($additional_arg),*).await;
-            // }
+//             // for _ in 0..repeat {
+//             $execute_call(self, builder, executable.borrow_mut(), ms_arg.borrow_mut(), $($additional_arg),*).await;
+//             // }
             
-            ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
-                builder,
-                ms_arg.borrow_mut(),
-                executable,
-            );
+//             ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
+//                 builder,
+//                 ms_arg.borrow_mut(),
+//                 executable,
+//             );
             
-            if intent.execution_times.len() == 1 {
-                let key_arg = self.key_arg(builder, intent_key)?;
-                let mut expired = ap::account::destroy_empty_intent::<
-                    am::multisig::Multisig,
-                    am::multisig::Approvals,
-                >(builder, ms_arg.borrow_mut(), key_arg);
+//             if intent.execution_times.len() == 1 {
+//                 let key_arg = self.key_arg(builder, intent_key)?;
+//                 let mut expired = ap::account::destroy_empty_intent::<
+//                     am::multisig::Multisig,
+//                     am::multisig::Approvals,
+//                 >(builder, ms_arg.borrow_mut(), key_arg);
     
-                for _ in 0..repeat {
-                    $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
-                }
-                ap::intents::destroy_empty_expired(builder, expired);
-            }
+//                 for _ in 0..repeat {
+//                     $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
+//                 }
+//                 ap::intents::destroy_empty_expired(builder, expired);
+//             }
 
-            Ok(())
-        }
-    };
-}
+//             Ok(())
+//         }
+//     };
+// }
 
-#[macro_export]
-macro_rules! define_delete_intent {
-    (
-        $delete_intent_name:ident,
-        $delete_calls:expr,
-        $($generic_type:ident,)?
-    ) => {
-        pub async fn $delete_intent_name$(<$generic_type: MoveType>)?(
-            &mut self,
-            builder: &mut TransactionBuilder,
-            intent_key: &str,
-        ) -> Result<()> {
-            let mut ms_arg = self.multisig_arg(builder).await?;
-            let clock_arg = self.clock_arg(builder).await?;
-            let key_arg = self.key_arg(builder, intent_key)?;
+// #[macro_export]
+// macro_rules! define_delete_intent {
+//     (
+//         $delete_intent_name:ident,
+//         $delete_calls:expr,
+//         $($generic_type:ident,)?
+//     ) => {
+//         pub async fn $delete_intent_name$(<$generic_type: MoveType>)?(
+//             &mut self,
+//             builder: &mut TransactionBuilder,
+//             intent_key: &str,
+//         ) -> Result<()> {
+//             let mut ms_arg = self.multisig_arg(builder).await?;
+//             let clock_arg = self.clock_arg(builder).await?;
+//             let key_arg = self.key_arg(builder, intent_key)?;
 
-            let current_timestamp = self.clock_timestamp().await?;
-            let intent = self.try_get_intent_mut(intent_key)?;
+//             let current_timestamp = self.clock_timestamp().await?;
+//             let intent = self.try_get_intent_mut(intent_key)?;
             
-            let mut expired = if current_timestamp > intent.expiration_time {
-                ap::account::delete_expired_intent::<
-                    am::multisig::Multisig,
-                    am::multisig::Approvals,
-                >(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow())
-            } else if intent.execution_times.is_empty() {
-                ap::account::destroy_empty_intent::<
-                    am::multisig::Multisig,
-                    am::multisig::Approvals,
-                >(builder, ms_arg.borrow_mut(), key_arg)
-            } else {
-                return Err(anyhow!("Intent cannot be deleted"));
-            };
+//             let mut expired = if current_timestamp > intent.expiration_time {
+//                 ap::account::delete_expired_intent::<
+//                     am::multisig::Multisig,
+//                     am::multisig::Approvals,
+//                 >(builder, ms_arg.borrow_mut(), key_arg, clock_arg.borrow())
+//             } else if intent.execution_times.is_empty() {
+//                 ap::account::destroy_empty_intent::<
+//                     am::multisig::Multisig,
+//                     am::multisig::Approvals,
+//                 >(builder, ms_arg.borrow_mut(), key_arg)
+//             } else {
+//                 return Err(anyhow!("Intent cannot be deleted"));
+//             };
 
-            let repeat = intent.get_executions_count().await?;
-            for _ in 0..repeat {
-                $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
-            }
-            ap::intents::destroy_empty_expired(builder, expired);
+//             let repeat = intent.get_executions_count().await?;
+//             for _ in 0..repeat {
+//                 $delete_calls(builder, expired.borrow_mut().into(), ms_arg.borrow_mut());
+//             }
+//             ap::intents::destroy_empty_expired(builder, expired);
 
-            Ok(())
-        }
-    };
-}
+//             Ok(())
+//         }
+//     };
+// }
 
-#[macro_export]
-macro_rules! define_intent_interface {
-    (
-        $intent_name:ident,
-        $request_args_type:ty,
-        $request_call:expr,
-        $execute_call:expr,
-        $delete_calls:expr,
-        $($generic_type:ident $(:$trait_bound:path)?,)?
-    ) => {
-        paste::paste! {
-            define_request_intent!(
-                [<request_ $intent_name>],
-                $request_args_type,
-                $request_call,
-                $($generic_type,)?
-            );
+// #[macro_export]
+// macro_rules! define_intent_interface {
+//     (
+//         $intent_name:ident,
+//         $request_args_type:ty,
+//         $request_call:expr,
+//         $execute_call:expr,
+//         $delete_calls:expr,
+//         $($generic_type:ident $(:$trait_bound:path)?,)?
+//     ) => {
+//         paste::paste! {
+//             define_request_intent!(
+//                 [<request_ $intent_name>],
+//                 $request_args_type,
+//                 $request_call,
+//                 $($generic_type,)?
+//             );
 
-            define_execute_intent!(
-                [<execute_ $intent_name>],
-                $execute_call,
-                $delete_calls,
-                $($generic_type $(:$trait_bound)?,)?
-            );
+//             define_execute_intent!(
+//                 [<execute_ $intent_name>],
+//                 $execute_call,
+//                 $delete_calls,
+//                 $($generic_type $(:$trait_bound)?,)?
+//             );
 
-            define_delete_intent!(
-                [<delete_ $intent_name>],
-                $delete_calls,
-                $($generic_type,)?
-            );
-        }
-    };
-}
+//             define_delete_intent!(
+//                 [<delete_ $intent_name>],
+//                 $delete_calls,
+//                 $($generic_type,)?
+//             );
+//         }
+//     };
+// }
 
 //**************************************************************************************************//
 // Tests                                                                              //
