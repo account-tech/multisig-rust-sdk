@@ -24,33 +24,17 @@ async fn main() -> Result<()> {
 
     let params = ParamsArgs::new(
         &mut builder,
-        "borrow_cap_again".to_string(),
-        "Borrow cap".to_string(),
+        "borrow_cap".to_string(),
+        "".to_string(),
         vec![0],
         1000000000000000000,
     );
-    // let args = ConfigMultisigArgs::new(
-    //     &mut builder,
-    //     vec![Address::from_hex("0x3c00d56434d581fdfd6e280626f7c8ee75cc9dac134d84290491e65f9b8b7161").unwrap()],
-    //     vec![1],
-    //     vec![vec![]],
-    //     1,
-    //     vec![],
-    //     vec![],
-    // );
-    // client.request_config_multisig(&mut builder, params, args).await?;
 
     define_move_type!(
         AdminCap,
         "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
     );
-    client
-        .request_borrow_cap::<AdminCap>(
-            &mut builder,
-            params,
-            (),
-        )
-        .await?;
+    client.request_borrow_cap::<AdminCap>(&mut builder, params).await?;
 
     execute_tx(client.sui(), builder).await;
 
