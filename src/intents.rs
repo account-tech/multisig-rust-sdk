@@ -5,7 +5,7 @@ use std::sync::Arc;
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, TypeTag};
 
-use crate::actions::{IntentType, IntentActionsType};
+use crate::actions::{IntentType, IntentActions};
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::utils;
@@ -29,7 +29,7 @@ pub struct Intent {
     pub role: String,
     pub actions_bag_id: Address,
     pub actions_types_bcs: Vec<(Vec<TypeTag>, Vec<u8>)>,
-    pub actions_args: Option<IntentActionsType>,
+    pub actions_args: Option<IntentActions>,
     pub outcome: Approvals,
 }
 
@@ -117,7 +117,7 @@ impl fmt::Debug for Intents {
 }
 
 impl Intent {
-    pub async fn get_actions_args(&mut self) -> Result<&IntentActionsType> {
+    pub async fn get_actions_args(&mut self) -> Result<&IntentActions> {
         if self.actions_args.is_none() {
             let mut df_types_with_bcs = Vec::new();
             let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.actions_bag_id).await?;

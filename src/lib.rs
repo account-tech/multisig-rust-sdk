@@ -16,7 +16,7 @@ use sui_sdk_types::{Address, Argument, ObjectData, ObjectId};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 use sui_transaction_builder::{Function, Serialized};
 
-use crate::actions::IntentActionsType;
+use crate::actions::IntentActions;
 use crate::dynamic_fields::DynamicFields;
 use crate::intents::{Intent, Intents};
 use crate::move_binding::account_actions as aa;
@@ -380,6 +380,75 @@ impl MultisigClient {
     }
 
     // === Intents ===
+
+    pub async fn request_config_multisig(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::ConfigMultisigArgs,
+    ) -> Result<()> {
+        let (mut multisig, auth, params, outcome) = self.prepare_request(builder, intent_args).await?;
+
+        am::config::request_config_multisig(
+            builder,
+            auth,
+            multisig.borrow_mut(),
+            params,
+            outcome,
+            actions_args.addresses,
+            actions_args.weights,
+            actions_args.roles,
+            actions_args.global,
+            actions_args.role_names,
+            actions_args.role_thresholds,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_config_multisig(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        am::config::execute_config_multisig(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key_arg = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key_arg);
+
+            am::config::delete_config_multisig(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_config_multisig(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        am::config::delete_config_multisig(builder, expired.borrow_mut());
+
+        Ok(())
+    }
 
     define_intent_interface!(
         config_multisig,
@@ -881,6 +950,101 @@ impl MultisigClient {
         let ms_input = self.obj(self.multisig_id()?).await?;
         let ms_arg = builder.input(ms_input.by_mut()).into();
         Ok(ms_arg)
+    }
+
+    pub async fn prepare_request(
+        &self,
+        builder: &mut TransactionBuilder,
+        params_args: ParamsArgs,
+    ) -> Result<(
+        Arg<ap::account::Account<am::multisig::Multisig>>,
+        Arg<ap::account::Auth>,
+        Arg<ap::intents::Params>,
+        Arg<am::multisig::Approvals>,
+    )> {
+        let multisig = self.multisig_arg(builder).await?;
+        let clock = self.clock_arg(builder).await?;
+
+        let auth = am::multisig::authenticate(builder, multisig.borrow());
+        let params = ap::intents::new_params(
+            builder,
+            params_args.key,
+            params_args.description,
+            params_args.execution_times,
+            params_args.expiration_time,
+            clock.borrow(),
+        );
+        let outcome = am::multisig::empty_outcome(builder);
+        
+        Ok((multisig, auth, params, outcome))
+    }
+
+    pub async fn prepare_execute(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<(
+        Arg<ap::account::Account<am::multisig::Multisig>>,
+        Arg<ap::executable::Executable<am::multisig::Approvals>>,
+        bool,
+        usize,
+    )> {
+        let mut multisig = self.multisig_arg(builder).await?;
+        let clock = self.clock_arg(builder).await?;
+        let key = self.key_arg(builder, intent_key)?;
+        
+        let executions_count = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
+        
+        let intent = self.try_get_intent(intent_key)?;
+        let current_timestamp = self.clock_timestamp().await?;
+        if current_timestamp < *intent.execution_times.first().unwrap() {
+            return Err(anyhow!("Intent cannot be executed"));
+        }
+        let is_last_execution = intent.execution_times.len() == 1;
+        
+        let executable = am::multisig::execute_intent(
+            builder,
+            multisig.borrow_mut(),
+            key,
+            clock.borrow(),
+        );
+
+        Ok((multisig, executable, is_last_execution, executions_count))
+    }
+
+    pub async fn prepare_delete(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<(
+        Arg<ap::account::Account<am::multisig::Multisig>>,
+        Arg<ap::intents::Expired>,
+        usize,
+    )> {
+        let mut multisig = self.multisig_arg(builder).await?;
+        let clock = self.clock_arg(builder).await?;
+        let key = self.key_arg(builder, intent_key)?;
+
+        let current_timestamp = self.clock_timestamp().await?;
+        let intent = self.try_get_intent_mut(intent_key)?;
+        
+        let expired = if current_timestamp > intent.expiration_time {
+            ap::account::delete_expired_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key, clock.borrow())
+        } else if intent.execution_times.is_empty() {
+            ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key)
+        } else {
+            return Err(anyhow!("Intent cannot be deleted"));
+        };
+
+        let executions_count = intent.get_executions_count().await?;
+
+        Ok((multisig, expired, executions_count))
     }
 }
 

@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use cynic::QueryBuilder;
+use sui_graphql_client::{
+    query_types::{MoveValue, ObjectFilter, ObjectsQuery, ObjectsQueryArgs},
+    Client, Direction, DynamicFieldOutput, PaginationFilter,
+};
 use sui_sdk_types::{Address, Object, Owner};
-use sui_graphql_client::{query_types::{MoveValue, ObjectFilter, ObjectsQuery, ObjectsQueryArgs}, Client, Direction, DynamicFieldOutput, PaginationFilter};
 use sui_transaction_builder::unresolved::Input;
 
 pub async fn get_object(sui_client: &Client, id: Address) -> Result<Object> {
@@ -14,7 +17,7 @@ pub async fn get_object(sui_client: &Client, id: Address) -> Result<Object> {
 pub async fn get_object_as_input(sui_client: &Client, id: Address) -> Result<Input> {
     let object = get_object(sui_client, id).await?;
     let mut input = Input::from(&object);
-    
+
     input = match object.owner() {
         Owner::Address(_) => input.with_owned_kind(),
         Owner::Object(_) => input.with_owned_kind(),
@@ -64,7 +67,10 @@ pub async fn get_objects(sui_client: &Client, id: Address) -> Result<Vec<MoveVal
     Ok(move_values)
 }
 
-pub async fn get_dynamic_fields(sui_client: &Client, id: Address) -> Result<Vec<DynamicFieldOutput>> {
+pub async fn get_dynamic_fields(
+    sui_client: &Client,
+    id: Address,
+) -> Result<Vec<DynamicFieldOutput>> {
     let mut df_outputs = Vec::new();
     let mut cursor = None;
     let mut has_next_page = true;
@@ -76,9 +82,7 @@ pub async fn get_dynamic_fields(sui_client: &Client, id: Address) -> Result<Vec<
             limit: Some(50),
         };
 
-        let resp = sui_client
-            .dynamic_fields(id, filter)
-            .await?;
+        let resp = sui_client.dynamic_fields(id, filter).await?;
         df_outputs.extend(resp.data().iter().cloned());
 
         cursor = resp.page_info().end_cursor.clone();
