@@ -8,11 +8,11 @@ pub mod params;
 pub mod utils;
 
 use anyhow::{anyhow, Ok, Result};
-use move_types::functions::{Arg, MutRef, Ref};
-use move_types::{Identifier, Key, MoveStruct, MoveType, StructTag, TypeTag};
+use move_types::functions::Arg;
+use move_types::{Key, MoveType};
 use std::sync::Arc;
 use sui_graphql_client::Client;
-use sui_sdk_types::{Address, Argument, ObjectData, ObjectId};
+use sui_sdk_types::{Address, ObjectData, ObjectId};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 use sui_transaction_builder::{Function, Serialized};
 
@@ -29,14 +29,14 @@ use crate::owned_objects::OwnedObjects;
 use crate::params::ParamsArgs;
 
 // TODO: MultisigCreateBuilder
-// TODO: intents, User
+// TODO: User
 
-static ACCOUNT_PROTOCOL_PACKAGE: &str =
-    "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
+// static ACCOUNT_PROTOCOL_PACKAGE: &str =
+    // "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
 static ACCOUNT_ACTIONS_PACKAGE: &str =
     "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94";
-static ACCOUNT_MULTISIG_PACKAGE: &str =
-    "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
+// static ACCOUNT_MULTISIG_PACKAGE: &str =
+    // "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
 static EXTENSIONS_OBJECT: &str =
     "0x698bc414f25a7036d9a72d6861d9d268e478492dc8bfef8b5c1c2f1eae769254";
 static FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
@@ -395,17 +395,9 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         am::config::request_config_multisig(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.addresses,
-            actions_args.weights,
-            actions_args.roles,
-            actions_args.global,
-            actions_args.role_names,
-            actions_args.role_thresholds,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.addresses, actions_args.weights, actions_args.roles, 
+            actions_args.global, actions_args.role_names, actions_args.role_thresholds,
         );
 
         Ok(())
@@ -470,15 +462,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         ap::config::request_config_deps(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            extensions.borrow(),
-            actions_args.names,
-            actions_args.addresses,
-            actions_args.versions,
+            builder, auth, multisig.borrow_mut(), params, outcome, extensions.borrow(), 
+            actions_args.names, actions_args.addresses, actions_args.versions,
         );
 
         Ok(())
@@ -712,17 +697,9 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::currency_intents::request_disable_rules::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.mint,
-            actions_args.burn,
-            actions_args.update_symbol,
-            actions_args.update_name,
-            actions_args.update_description,
-            actions_args.update_icon,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.mint, actions_args.burn, actions_args.update_symbol, 
+            actions_args.update_name, actions_args.update_description, actions_args.update_icon,
         );
 
         Ok(())
@@ -786,15 +763,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::currency_intents::request_update_metadata::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.symbol,
-            actions_args.name,
-            actions_args.description,
-            actions_args.icon_url,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.symbol, actions_args.name, actions_args.description, actions_args.icon_url,
         );
 
         Ok(())
@@ -813,8 +783,11 @@ impl MultisigClient {
             _executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
-        let mut coin_metadata = self.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_id).await?;
-        aa::currency_intents::execute_update_metadata::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut(), coin_metadata.borrow_mut());
+        let mut coin_metadata = 
+            self.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_id).await?;
+        aa::currency_intents::execute_update_metadata::<_, _, CoinType>(
+            builder, executable.borrow_mut(), multisig.borrow_mut(), coin_metadata.borrow_mut()
+        );
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -860,13 +833,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::currency_intents::request_mint_and_transfer::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.amounts,
-            actions_args.recipients,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.amounts, actions_args.recipients,
         );
 
         Ok(())
@@ -938,15 +906,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::currency_intents::request_mint_and_vest::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.total_amount,
-            actions_args.start_timestamp,
-            actions_args.end_timestamp,
-            actions_args.recipient,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.total_amount, actions_args.start_timestamp, actions_args.end_timestamp, actions_args.recipient,
         );
 
         Ok(())
@@ -1012,13 +973,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::currency_intents::request_withdraw_and_burn::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.coin_id,
-            actions_args.amount,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.coin_id, actions_args.amount,
         );
 
         Ok(())
@@ -1091,14 +1047,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::owned_intents::request_withdraw_and_transfer_to_vault::<_, _, CoinType>(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.coin_id,
-            actions_args.coin_amount,
-            actions_args.vault_name,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.coin_id, actions_args.coin_amount, actions_args.vault_name,
         );
 
         Ok(())
@@ -1171,13 +1121,8 @@ impl MultisigClient {
         ) = self.prepare_request(builder, intent_args).await?;
 
         aa::owned_intents::request_withdraw_and_transfer(
-            builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.object_ids,
-            actions_args.recipients,
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.object_ids, actions_args.recipients,
         );
 
         Ok(())
@@ -1268,14 +1213,8 @@ impl MultisigClient {
 
         aa::owned_intents::request_withdraw_and_vest(
             builder,
-            auth,
-            multisig.borrow_mut(),
-            params,
-            outcome,
-            actions_args.coin_id,
-            actions_args.start_timestamp,
-            actions_args.end_timestamp,
-            actions_args.recipient,
+            auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.coin_id, actions_args.start_timestamp, actions_args.end_timestamp, actions_args.recipient,
         );
 
         Ok(())
@@ -1328,6 +1267,230 @@ impl MultisigClient {
         ) = self.prepare_delete(builder, intent_key).await?;
 
         ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+        aa::vesting::delete_vest(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_upgrade_package(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::UpgradePackageArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::package_upgrade_intents::request_upgrade_package(
+            builder,auth,multisig.borrow_mut(),params,outcome,
+            actions_args.package_name,actions_args.digest,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_upgrade_package(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+        package_id: ObjectId,
+        modules: Vec<Vec<u8>>,
+        dependencies: Vec<ObjectId>,
+    ) -> Result<()> {
+        let mut multisig = self.multisig_arg(builder).await?;
+        let clock = self.clock_arg(builder).await?;
+        let key = self.key_arg(builder, intent_key)?;
+        
+        let intent = self.try_get_intent(intent_key)?;
+        let current_timestamp = self.clock_timestamp().await?;
+        if current_timestamp < *intent.execution_times.first().unwrap() {
+            return Err(anyhow!("Intent cannot be executed"));
+        }
+        
+        let mut executable = am::multisig::execute_intent(
+            builder, multisig.borrow_mut(), key, clock.borrow(),
+        );
+
+        let ticket = aa::package_upgrade_intents::execute_upgrade_package(
+            builder, executable.borrow_mut(), multisig.borrow_mut(), clock.borrow()
+        );
+        let receipt = builder.upgrade(modules, dependencies, package_id, ticket.into());
+        aa::package_upgrade_intents::execute_commit_upgrade(
+            builder, executable.borrow_mut(), multisig.borrow_mut(), receipt.into()
+        );
+
+        if intent.execution_times.len() == 1 {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+            aa::vesting::delete_vest(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_upgrade_package(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::package_upgrade::delete_upgrade(builder, expired.borrow_mut());
+        aa::package_upgrade::delete_commit(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
+    pub async fn request_spend_and_transfer<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::SpendAndTransferArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::vault_intents::request_spend_and_transfer::<_, _, CoinType>(
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.vault_name, actions_args.amounts, actions_args.recipients,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_spend_and_transfer<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        for _ in 0..executions_count {
+            aa::vault_intents::execute_spend_and_transfer::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+        }
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            for _ in 0..executions_count {
+                aa::vault::delete_spend::<CoinType>(builder, expired.borrow_mut());
+                aa::transfer::delete_transfer(builder, expired.borrow_mut());
+            }
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_spend_and_transfer<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        for _ in 0..executions_count {
+            aa::vault::delete_spend::<CoinType>(builder, expired.borrow_mut());
+            aa::transfer::delete_transfer(builder, expired.borrow_mut());
+        }
+
+        Ok(())
+    }
+
+    pub async fn request_spend_and_vest<CoinType: MoveType>(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::SpendAndVestArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::vault_intents::request_spend_and_vest::<_, _, CoinType>(
+            builder, auth, multisig.borrow_mut(), params, outcome, 
+            actions_args.vault_name, actions_args.coin_amount, 
+            actions_args.start_timestamp, actions_args.end_timestamp, actions_args.recipient,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_spend_and_vest<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            mut executable, 
+            is_last_execution, 
+            _executions_count
+        ) = self.prepare_execute(builder, intent_key).await?;
+
+        aa::vault_intents::execute_spend_and_vest::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+
+        if is_last_execution {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            aa::vault::delete_spend::<CoinType>(builder, expired.borrow_mut());
+            aa::vesting::delete_vest(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_spend_and_vest<CoinType: MoveType>(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::vault::delete_spend::<CoinType>(builder, expired.borrow_mut());
         aa::vesting::delete_vest(builder, expired.borrow_mut());
 
         Ok(())

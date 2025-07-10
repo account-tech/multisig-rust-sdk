@@ -147,13 +147,13 @@ define_args_struct!(RestrictPolicyArgs {
     policy: u8,
 });
 
-define_args_struct!(SpendAndTransfer {
+define_args_struct!(SpendAndTransferArgs {
     vault_name: String,
     amounts: Vec<u64>,
     recipients: Vec<Address>,
 });
 
-define_args_struct!(SpendAndVest {
+define_args_struct!(SpendAndVestArgs {
     vault_name: String,
     coin_amount: u64,
     start_timestamp: u64,
