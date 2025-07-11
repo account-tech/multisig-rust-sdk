@@ -209,9 +209,6 @@ impl User {
         builder: &mut TransactionBuilder,
         user: Arg<ap::user::User>,
     ) -> Result<()> {
-        if self.id.is_none() {
-            return Err(anyhow::anyhow!("User not found"));
-        }
         let mut registry = self.registry_arg(builder).await?;
         let address = builder.input(Serialized(&self.address));
         ap::user::transfer(builder, registry.borrow_mut(), user, address.into());
@@ -290,7 +287,7 @@ impl User {
         user_id: Address,
     ) -> Result<Arg<ap::user::User>> {
         let user_input = utils::get_object_as_input(&self.sui_client, user_id).await?;
-        let user_arg = builder.input(user_input.by_val()).into();
+        let user_arg = builder.input(user_input).into();
         Ok(user_arg)
     }
 
@@ -300,7 +297,7 @@ impl User {
         invite_id: Address,
     ) -> Result<Arg<ap::user::Invite>> {
         let invite_input = utils::get_object_as_input(&self.sui_client, invite_id).await?;
-        let invite_arg = builder.input(invite_input.by_val()).into();
+        let invite_arg = builder.input(invite_input).into();
         Ok(invite_arg)
     }
 }

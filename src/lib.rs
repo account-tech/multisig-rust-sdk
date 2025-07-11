@@ -6,6 +6,8 @@ pub mod user;
 pub mod utils;
 pub mod multisig_builder;
 
+pub use multisig_builder::MultisigBuilder;
+
 use std::{fmt, sync::Arc};
 use anyhow::{anyhow, Ok, Result};
 use move_types::{Key, MoveType, functions::Arg};
@@ -99,6 +101,14 @@ impl MultisigClient {
         );
 
         Ok(account_obj)
+    }
+
+    pub async fn share_multisig(
+        &self, 
+        builder: &mut TransactionBuilder, 
+        multisig: Arg<ap::account::Account<am::multisig::Multisig>>
+    ) {
+        sui::transfer::public_share_object(builder, multisig);
     }
 
     pub async fn load_multisig(&mut self, id: Address) -> Result<()> {

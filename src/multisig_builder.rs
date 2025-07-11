@@ -26,7 +26,7 @@ pub struct Config {
 }
 
 impl MultisigBuilder {
-    pub async fn new(client: MultisigClient, builder: TransactionBuilder) -> Self {
+    pub fn new(client: MultisigClient, builder: TransactionBuilder) -> Self {
         Self {
             client,
             builder,
@@ -35,12 +35,12 @@ impl MultisigBuilder {
         }
     }
 
-    pub async fn set_name(mut self, name: &str) -> Self {
+    pub fn set_name(mut self, name: &str) -> Self {
         self.name = Some(name.to_string());
         self
     }
 
-    pub async fn set_global_threshold(mut self, threshold: u64) -> Self {
+    pub fn set_global_threshold(mut self, threshold: u64) -> Self {
         if self.config.is_none() {
             self.config = Some(Config::default());
         }
@@ -48,7 +48,7 @@ impl MultisigBuilder {
         self
     }
 
-    pub async fn add_member(mut self, address: &str, weight: u64, roles: Vec<&str>) -> Self {
+    pub fn add_member(mut self, address: &str, weight: u64, roles: Vec<&str>) -> Self {
         if self.config.is_none() {
             self.config = Some(Config::default());
         }
@@ -68,7 +68,7 @@ impl MultisigBuilder {
         self
     }
 
-    pub async fn add_role(mut self, role: &str, threshold: u64) -> Self {
+    pub fn add_role(mut self, role: &str, threshold: u64) -> Self {
         if self.config.is_none() {
             self.config = Some(Config::default());
         }
@@ -202,6 +202,7 @@ impl MultisigBuilder {
                 executable.borrow_mut(),
                 multisig.borrow_mut(),
             );
+            ap::account::confirm_execution(&mut builder, multisig.borrow_mut(), executable);
 
             let key = client.key_arg(&mut builder, "config_multisig")?;
             let mut expired = ap::account::destroy_empty_intent::<
@@ -213,18 +214,28 @@ impl MultisigBuilder {
             ap::intents::destroy_empty_expired(&mut builder, expired);
 
             for addr in addresses {
-                client
-                    .user()
-                    .unwrap()
-                    .send_invite(&mut builder, &multisig, addr.parse().unwrap())
-                    .await?;
+                if addr == client.user().unwrap().address.to_string() {
+                    // add multisig to User object
+                    am::multisig::join(&mut builder, user.borrow_mut(), multisig.borrow());
+                } else {    
+                    // send invite to other addresses
+                    client
+                        .user()
+                        .unwrap()
+                        .send_invite(&mut builder, &multisig, addr.parse().unwrap())
+                        .await?;
+                }
             }
         }
-        // add multisig to User object
-        am::multisig::join(&mut builder, user.borrow_mut(), multisig.borrow());
         // transfer and share objects
-        client.user().unwrap().transfer_user(&mut builder, user).await?;
         sui::transfer::public_share_object(&mut builder, multisig);
+        if client.user().unwrap().id.is_none() {
+            client
+                .user()
+                .unwrap()
+                .transfer_user(&mut builder, user)
+                .await?;
+        }
 
         Ok((client, builder))
     }
