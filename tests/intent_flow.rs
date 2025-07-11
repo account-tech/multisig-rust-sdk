@@ -2,8 +2,7 @@ mod utils;
 use utils::{init_tx, execute_tx, get_created_multisig};
 
 use account_multisig_sdk::MultisigClient;
-use account_multisig_sdk::params::ParamsArgs;
-use account_multisig_sdk::params::ConfigMultisigArgs;
+use account_multisig_sdk::proposals::params::{ParamsArgs, ConfigMultisigArgs};
 use sui_sdk_types::Address;
 
 #[tokio::test]
@@ -57,7 +56,7 @@ async fn test_config_multisig_intent() {
         assert_ne!(intent.expiration_time, 0);
         assert_eq!(intent.role, "460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867::config");
         assert_ne!(intent.actions_bag_id, Address::ZERO);
-        assert!(intent.actions_bcs.is_empty());
+        assert!(intent.actions_types_bcs.is_empty());
         assert_eq!(intent.outcome.total_weight, 0);
         assert_eq!(intent.outcome.role_weight, 0);
         assert_eq!(intent.outcome.approved.len(), 0);
@@ -67,7 +66,7 @@ async fn test_config_multisig_intent() {
     {
         let (pk, mut builder) = init_tx(client.sui()).await;
         let address = pk.public_key().derive_address();
-        client.approve_intent(&mut builder, "config_multisig".to_string()).await.unwrap();
+        client.approve_intent(&mut builder, "config_multisig").await.unwrap();
         execute_tx(client.sui(), pk, builder).await;
         // check results
         client.refresh().await.unwrap();
@@ -81,12 +80,11 @@ async fn test_config_multisig_intent() {
     {
         let (pk, mut builder) = init_tx(client.sui()).await;
         let address = pk.public_key().derive_address();
-        let clear = client.intent("config_multisig").unwrap().execution_times.len() <= 1;
-        client.execute_config_multisig(&mut builder, "config_multisig".to_string(), clear).await.unwrap();
+        client.execute_config_multisig(&mut builder, "config_multisig").await.unwrap();
         execute_tx(client.sui(), pk, builder).await;
         // check results
         client.refresh().await.unwrap();
-        assert!(client.intent("config_multisig").is_none());
+        assert!(client.intent("config_multisig").is_err());
         assert_eq!(client.multisig().unwrap().config.members.len(), 2);
         assert_eq!(client.multisig().unwrap().config.members[0].address, address.to_string());
         assert_eq!(client.multisig().unwrap().config.members[0].weight, 2);

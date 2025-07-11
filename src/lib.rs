@@ -668,7 +668,7 @@ impl MultisigClient {
             executable,
         );
 
-        if self.try_get_intent(intent_key)?.execution_times.len() == 1 {
+        if self.intent(intent_key)?.execution_times.len() == 1 {
             let key_arg = self.key_arg(builder, intent_key)?;
             let mut expired = ap::account::destroy_empty_intent::<
                 am::multisig::Multisig,
@@ -1010,7 +1010,7 @@ impl MultisigClient {
             _executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
-        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let actions_args = self.intent_mut(intent_key)?.get_actions_args().await?;
         let coin_id = match actions_args {
             IntentActions::WithdrawAndBurn(actions_args) => actions_args.coin_id,
             _ => return Err(anyhow!("Intent {} is not a WithdrawAndBurn intent", intent_key)),
@@ -1084,7 +1084,7 @@ impl MultisigClient {
             _executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
-        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let actions_args = self.intent_mut(intent_key)?.get_actions_args().await?;
         let coin_id = match actions_args {
             IntentActions::WithdrawAndTransferToVault(actions_args) => actions_args.coin_id,
             _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransferToVault intent", intent_key)),
@@ -1158,7 +1158,7 @@ impl MultisigClient {
             executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
-        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let actions_args = self.intent_mut(intent_key)?.get_actions_args().await?;
         let transfers = match actions_args {
             IntentActions::WithdrawAndTransfer(actions_args) => actions_args.transfers.clone(),
             _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransfer intent", intent_key)),
@@ -1250,7 +1250,7 @@ impl MultisigClient {
             _executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
-        let actions_args = self.try_get_intent_mut(intent_key)?.get_actions_args().await?;
+        let actions_args = self.intent_mut(intent_key)?.get_actions_args().await?;
         let coin_id = match actions_args {
             IntentActions::WithdrawAndVest(actions_args) => actions_args.coin_id,
             _ => return Err(anyhow!("Intent {} is not a WithdrawAndTransfer intent", intent_key)),
@@ -1323,7 +1323,7 @@ impl MultisigClient {
         let clock = self.clock_arg(builder).await?;
         let key = self.key_arg(builder, intent_key)?;
         
-        let intent = self.try_get_intent(intent_key)?;
+        let intent = self.intent(intent_key)?;
         let current_timestamp = self.clock_timestamp().await?;
         if current_timestamp < *intent.execution_times.first().unwrap() {
             return Err(anyhow!("Intent cannot be executed"));
@@ -1547,11 +1547,11 @@ impl MultisigClient {
         self.multisig.as_mut()?.intents.as_mut()
     }
 
-    pub fn try_get_intent(&self, key: &str) -> Result<&Intent> {
+    pub fn intent(&self, key: &str) -> Result<&Intent> {
         self.intents().and_then(|i| i.get_intent(key)).ok_or(anyhow!("Intent not found"))
     }
 
-    pub fn try_get_intent_mut(&mut self, key: &str) -> Result<&mut Intent> {
+    pub fn intent_mut(&mut self, key: &str) -> Result<&mut Intent> {
         self.intents_mut().and_then(|i| i.get_intent_mut(key)).ok_or(anyhow!("Intent not found"))
     }
 
@@ -1704,9 +1704,9 @@ impl MultisigClient {
         let clock = self.clock_arg(builder).await?;
         let key = self.key_arg(builder, intent_key)?;
         
-        let executions_count = self.try_get_intent_mut(intent_key)?.get_executions_count().await?;
+        let executions_count = self.intent_mut(intent_key)?.get_executions_count().await?;
         
-        let intent = self.try_get_intent(intent_key)?;
+        let intent = self.intent(intent_key)?;
         let current_timestamp = self.clock_timestamp().await?;
         if current_timestamp < *intent.execution_times.first().unwrap() {
             return Err(anyhow!("Intent cannot be executed"));
@@ -1737,7 +1737,7 @@ impl MultisigClient {
         let key = self.key_arg(builder, intent_key)?;
 
         let current_timestamp = self.clock_timestamp().await?;
-        let intent = self.try_get_intent_mut(intent_key)?;
+        let intent = self.intent_mut(intent_key)?;
         
         let expired = if current_timestamp > intent.expiration_time {
             ap::account::delete_expired_intent::<
