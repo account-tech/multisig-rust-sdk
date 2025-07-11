@@ -5,7 +5,7 @@ use std::sync::Arc;
 use sui_graphql_client::Client;
 use sui_sdk_types::{Address, TypeTag};
 
-use crate::intents::actions::{IntentType, IntentActions};
+use crate::proposals::actions::{IntentType, IntentActions};
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 use crate::utils;
