@@ -39,7 +39,7 @@ impl OwnedObjects {
     }
 
     pub async fn refresh(&mut self, multisig_id: Address) -> Result<()> {
-        let move_values = utils::get_objects(&self.sui_client, multisig_id).await?;
+        let move_values = utils::get_objects_with_fields(&self.sui_client, multisig_id, None).await?;
 
         for move_value in move_values {
             let fields = move_value

@@ -27,8 +27,81 @@ pub async fn get_object_as_input(sui_client: &Client, id: Address) -> Result<Inp
     Ok(input)
 }
 
+pub async fn get_owned_objects(
+    sui_client: &Client,
+    owner: Address,
+    type_: Option<&str>,
+) -> Result<Vec<Object>> {
+    let mut objects = Vec::new();
+    let mut cursor = None;
+    let mut has_next_page = true;
+
+    while has_next_page {
+        let filter = PaginationFilter {
+            direction: Direction::Forward,
+            cursor: cursor.clone(),
+            limit: Some(50),
+        };
+
+        let resp = sui_client
+            .objects(
+                Some(ObjectFilter {
+                    owner: Some(owner),
+                    type_,
+                    object_ids: None,
+                }),
+                filter
+            )
+            .await?;
+        objects.extend(resp.data().iter().cloned());
+
+        cursor = resp.page_info().end_cursor.clone();
+        has_next_page = resp.page_info().has_next_page;
+    }
+
+    Ok(objects)
+}
+
+pub async fn get_objects(
+    sui_client: &Client,
+    mut ids: Vec<Address>,
+) -> Result<Vec<Object>> {
+    let mut objects = Vec::new();
+    let mut cursor = None;
+    let mut has_next_page = true;
+
+    while has_next_page {
+        let filter = PaginationFilter {
+            direction: Direction::Forward,
+            cursor: cursor.clone(),
+            limit: Some(50),
+        };
+
+        let mut object_ids = Some(ids.clone());
+        if ids.len() > 50 {
+            object_ids = Some(ids.split_off(50));
+        }
+
+        let resp = sui_client
+            .objects(
+                Some(ObjectFilter {
+                    object_ids,
+                    ..Default::default()
+                }),
+                filter
+            )
+            .await?;
+        objects.extend(resp.data().iter().cloned());
+
+        cursor = resp.page_info().end_cursor.clone();
+        has_next_page = resp.page_info().has_next_page;
+    }
+
+    Ok(objects)
+}
+
 // gets `MoveValue`s from sui-graphql-client (to get the fields json)
-pub async fn get_objects(sui_client: &Client, id: Address) -> Result<Vec<MoveValue>> {
+pub async fn get_objects_with_fields(sui_client: &Client, owner: Address, type_: Option<&str>) -> Result<Vec<MoveValue>> {
     let mut move_values = Vec::new();
 
     let mut cursor = None;
@@ -38,7 +111,8 @@ pub async fn get_objects(sui_client: &Client, id: Address) -> Result<Vec<MoveVal
             after: cursor.as_deref(),
             before: None,
             filter: Some(ObjectFilter {
-                owner: Some(id),
+                owner: Some(owner),
+                type_,
                 ..Default::default()
             }),
             first: Some(50),
@@ -71,7 +145,7 @@ pub async fn get_dynamic_fields(
     sui_client: &Client,
     id: Address,
 ) -> Result<Vec<DynamicFieldOutput>> {
-    let mut df_outputs = Vec::new();
+    let mut objects = Vec::new();
     let mut cursor = None;
     let mut has_next_page = true;
 
@@ -83,11 +157,11 @@ pub async fn get_dynamic_fields(
         };
 
         let resp = sui_client.dynamic_fields(id, filter).await?;
-        df_outputs.extend(resp.data().iter().cloned());
+        objects.extend(resp.data().iter().cloned());
 
         cursor = resp.page_info().end_cursor.clone();
         has_next_page = resp.page_info().has_next_page;
     }
 
-    Ok(df_outputs)
+    Ok(objects)
 }

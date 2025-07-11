@@ -2,6 +2,7 @@ pub mod assets;
 pub mod intents;
 pub mod move_binding;
 pub mod multisig;
+pub mod user;
 pub mod utils;
 
 use std::sync::Arc;
@@ -15,16 +16,17 @@ use crate::move_binding::{account_actions as aa, account_extensions as ae, accou
 use crate::intents::{actions::IntentActions, params::{self, ParamsArgs}, intents::{Intent, Intents}};
 use crate::assets::{dynamic_fields::DynamicFields, owned_objects::OwnedObjects};
 use crate::multisig::Multisig;
+use crate::user::User;
 
 // TODO: MultisigCreateBuilder
 // TODO: User
 
-// static ACCOUNT_PROTOCOL_PACKAGE: &str =
-    // "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
+static ACCOUNT_MULTISIG_PACKAGE: &str =
+    "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
+static ACCOUNT_PROTOCOL_PACKAGE: &str =
+    "0x10c87c29ea5d5674458652ababa246742a763f9deafed11608b7f0baea296484";
 static ACCOUNT_ACTIONS_PACKAGE: &str =
     "0xf477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94";
-// static ACCOUNT_MULTISIG_PACKAGE: &str =
-    // "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
 static EXTENSIONS_OBJECT: &str =
     "0x698bc414f25a7036d9a72d6861d9d268e478492dc8bfef8b5c1c2f1eae769254";
 static FEE_OBJECT: &str = "0xc27762578a0b1f37224550dcfd0442f37dc82744b802d3517822d1bd2718598f";
@@ -33,6 +35,7 @@ static CLOCK_OBJECT: &str = "0x0000000000000000000000000000000000000000000000000
 pub struct MultisigClient {
     sui_client: Arc<Client>,
     multisig: Option<Multisig>,
+    user: Option<User>,
 }
 
 impl MultisigClient {
@@ -42,6 +45,7 @@ impl MultisigClient {
         Self {
             sui_client: Arc::new(sui_client),
             multisig: None,
+            user: None,
         }
     }
 
@@ -49,6 +53,7 @@ impl MultisigClient {
         Ok(Self {
             sui_client: Arc::new(Client::new(url)?),
             multisig: None,
+            user: None,
         })
     }
 
@@ -56,6 +61,7 @@ impl MultisigClient {
         Self {
             sui_client: Arc::new(Client::new_testnet()),
             multisig: None,
+            user: None,
         }
     }
 
@@ -63,6 +69,7 @@ impl MultisigClient {
         Self {
             sui_client: Arc::new(Client::new_mainnet()),
             multisig: None,
+            user: None,
         }
     }
 
@@ -100,9 +107,17 @@ impl MultisigClient {
         Ok(())
     }
 
+    pub async fn load_user(&mut self, address: Address) -> Result<()> {
+        self.user = Some(User::from_address(self.sui_client.clone(), address).await?);
+        Ok(())
+    }
+
     pub async fn refresh(&mut self) -> Result<()> {
         if let Some(multisig) = self.multisig.as_mut() {
             multisig.refresh().await?;
+        }
+        if let Some(user) = self.user.as_mut() {
+            user.refresh().await?;
         }
         Ok(())
     }
@@ -1487,6 +1502,10 @@ impl MultisigClient {
 
     pub fn sui(&self) -> &Client {
         &self.sui_client
+    }
+
+    pub fn user(&self) -> Option<&User> {
+        self.user.as_ref()
     }
 
     pub fn multisig(&self) -> Option<&Multisig> {
