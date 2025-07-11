@@ -1,10 +1,12 @@
 use anyhow::Result;
+use move_types::functions::Arg;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use sui_graphql_client::query_types::ObjectFilter;
 use sui_graphql_client::{Client, PaginationFilter};
 use sui_sdk_types::{Address, ObjectData, ObjectId};
+use sui_transaction_builder::{Serialized, TransactionBuilder};
 
 use crate::move_binding::{account_multisig as am, account_protocol as ap};
 use crate::utils;
@@ -38,6 +40,8 @@ pub struct Invite {
 }
 
 impl User {
+    pub const REGISTRY: &str = "0xa9ec2fd2c9ac1ed9cde4972da6014818c3343a1d65dc140a8d51567c20d8992e";
+
     pub async fn from_address(sui_client: Arc<Client>, address: Address) -> Result<Self> {
         let mut user = Self {
             sui_client,
@@ -149,7 +153,12 @@ impl User {
         for object in invite_objects {
             if let ObjectData::Struct(move_struct) = object.data() {
                 let invite: ap::user::Invite = bcs::from_bytes(move_struct.contents())?;
-                if invite.account_type == format!("{}::multisig::Multisig", &crate::ACCOUNT_MULTISIG_PACKAGE[2..]) {
+                if invite.account_type
+                    == format!(
+                        "{}::multisig::Multisig",
+                        &crate::ACCOUNT_MULTISIG_PACKAGE[2..]
+                    )
+                {
                     multisig_to_invite.insert(invite.account_addr, invite.id);
                 }
             }
@@ -182,6 +191,77 @@ impl User {
         }
 
         Ok(invites)
+    }
+
+    pub async fn create_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
+        if self.id != "0x0".parse().unwrap() {
+            return Err(anyhow::anyhow!("User already exists"));
+        }
+        let user = ap::user::new(builder);
+        let address = builder.input(Serialized(&self.address));
+        builder.transfer_objects(vec![user.into()], address);
+        Ok(())
+    }
+
+    pub async fn transfer_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
+        let mut registry = self.registry_arg(builder).await?;
+        let user = self.user_arg(builder).await?;
+        let address = builder.input(Serialized(&self.address));
+        ap::user::transfer(builder, registry.borrow_mut(), user, address.into());
+        Ok(())
+    }
+
+    pub async fn delete_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
+        let mut registry = self.registry_arg(builder).await?;
+        let user = self.user_arg(builder).await?;
+        ap::user::destroy(builder, registry.borrow_mut(), user);
+        Ok(())
+    }
+
+    pub async fn accept_invite(&self, builder: &mut TransactionBuilder, invite_id: Address) -> Result<()> {
+        let mut user = self.user_arg(builder).await?;
+        let invite = self.invite_arg(builder, invite_id).await?;
+        ap::user::accept_invite(builder, user.borrow_mut(), invite);
+        Ok(())
+    }
+
+    pub async fn refuse_invite(&self, builder: &mut TransactionBuilder, invite_id: Address) -> Result<()> {
+        let invite = self.invite_arg(builder, invite_id).await?;
+        ap::user::refuse_invite(builder, invite);
+        Ok(())
+    }
+
+    // === Helpers ===
+
+    pub async fn registry_arg(
+        &self,
+        builder: &mut TransactionBuilder,
+    ) -> Result<Arg<ap::user::Registry>> {
+        let registry_input =
+            utils::get_object_as_input(&self.sui_client, Self::REGISTRY.parse().unwrap()).await?;
+        let registry_arg = builder.input(registry_input.by_mut()).into();
+        Ok(registry_arg)
+    }
+
+    pub async fn user_arg(
+        &self,
+        builder: &mut TransactionBuilder,
+    ) -> Result<Arg<ap::user::User>> {
+        let user_input =
+            utils::get_object_as_input(&self.sui_client, *self.id.as_address()).await?;
+        let user_arg = builder.input(user_input.by_val()).into();
+        Ok(user_arg)
+    }
+
+    pub async fn invite_arg(
+        &self,
+        builder: &mut TransactionBuilder,
+        invite_id: Address,
+    ) -> Result<Arg<ap::user::Invite>> {
+        let invite_input =
+            utils::get_object_as_input(&self.sui_client, invite_id).await?;
+        let invite_arg = builder.input(invite_input.by_val()).into();
+        Ok(invite_arg)
     }
 }
 

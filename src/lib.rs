@@ -1,5 +1,5 @@
 pub mod assets;
-pub mod intents;
+pub mod proposals;
 pub mod move_binding;
 pub mod multisig;
 pub mod user;
@@ -13,7 +13,7 @@ use sui_sdk_types::{Address, ObjectData, ObjectId};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder, Function, Serialized};
 
 use crate::move_binding::{account_actions as aa, account_extensions as ae, account_multisig as am, account_protocol as ap, sui};
-use crate::intents::{actions::IntentActions, params::{self, ParamsArgs}, intents::{Intent, Intents}};
+use crate::proposals::{actions::IntentActions, params::{self, ParamsArgs}, intents::{Intent, Intents}};
 use crate::assets::{dynamic_fields::DynamicFields, owned_objects::OwnedObjects};
 use crate::multisig::Multisig;
 use crate::user::User;
