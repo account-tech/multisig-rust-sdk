@@ -131,6 +131,13 @@ impl MultisigClient {
         Ok(())
     }
 
+    pub async fn switch_multisig(&mut self, id: Address) -> Result<()> {
+        if let Some(multisig) = self.multisig.as_mut() {
+            multisig.switch_multisig(id).await?;
+        }
+        Ok(())
+    }
+
     pub async fn approve_intent(
         &self,
         builder: &mut TransactionBuilder,

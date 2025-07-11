@@ -13,6 +13,7 @@ use crate::move_binding::account_actions as aa;
 
 pub struct DynamicFields {
     pub sui_client: Arc<Client>,
+    pub multisig_id: Address,
     pub caps: Vec<Cap>,
     pub currencies: HashMap<String, Currency>,
     pub kiosks: HashMap<String, Kiosk>,
@@ -64,18 +65,19 @@ impl DynamicFields {
     pub async fn from_multisig_id(sui_client: Arc<Client>, multisig_id: Address) -> Result<Self> {
         let mut dynamic_fields = Self {
             sui_client,
+            multisig_id,
             caps: Vec::new(),
             currencies: HashMap::new(),
             kiosks: HashMap::new(),
             packages: HashMap::new(),
             vaults: HashMap::new(),
         };
-        dynamic_fields.refresh(multisig_id).await?;
+        dynamic_fields.refresh().await?;
         Ok(dynamic_fields)
     }
 
-    pub async fn refresh(&mut self, multisig_id: Address) -> Result<()> {
-        let df_outputs = utils::get_dynamic_fields(&self.sui_client, multisig_id).await?;
+    pub async fn refresh(&mut self) -> Result<()> {
+        let df_outputs = utils::get_dynamic_fields(&self.sui_client, self.multisig_id).await?;
         for df_output in df_outputs {
             if let TypeTag::Struct(struct_tag) = &df_output.name.type_ {
                 let type_name = format!("{}::{}::{}", struct_tag.address, struct_tag.module, struct_tag.name);
@@ -219,6 +221,12 @@ impl DynamicFields {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub async fn switch_multisig(&mut self, multisig_id: Address) -> Result<()> {
+        self.multisig_id = multisig_id;
+        self.refresh().await?;
         Ok(())
     }
 }

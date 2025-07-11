@@ -87,6 +87,12 @@ impl Intents {
         Ok(())
     }
 
+    pub async fn switch_multisig(&mut self, bag_id: Address) -> Result<()> {
+        self.bag_id = bag_id;
+        self.refresh().await?;
+        Ok(())
+    }
+
     pub fn get_intent(&self, key: &str) -> Option<&Intent> {
         self.intents.get(key)
     }

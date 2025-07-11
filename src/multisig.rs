@@ -183,6 +183,12 @@ impl Multisig {
 
         Ok(())
     }
+
+    pub async fn switch_multisig(&mut self, id: Address) -> Result<()> {
+        self.id = id;
+        self.refresh().await?;
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Multisig {

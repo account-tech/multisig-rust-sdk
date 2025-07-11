@@ -9,6 +9,7 @@ use crate::utils;
 
 pub struct OwnedObjects {
     pub sui_client: Arc<Client>,
+    pub multisig_id: Address,
     pub coins: Vec<Coin>,
     pub objects: Vec<Object>,
 }
@@ -31,15 +32,16 @@ impl OwnedObjects {
     pub async fn from_multisig_id(sui_client: Arc<Client>, multisig_id: Address) -> Result<Self> {
         let mut owned_objects = Self {
             sui_client,
+            multisig_id,
             coins: Vec::new(),
             objects: Vec::new(),
         };
-        owned_objects.refresh(multisig_id).await?;
+        owned_objects.refresh().await?;
         Ok(owned_objects)
     }
 
-    pub async fn refresh(&mut self, multisig_id: Address) -> Result<()> {
-        let move_values = utils::get_objects_with_fields(&self.sui_client, multisig_id, None).await?;
+    pub async fn refresh(&mut self) -> Result<()> {
+        let move_values = utils::get_objects_with_fields(&self.sui_client, self.multisig_id, None).await?;
 
         for move_value in move_values {
             let fields = move_value
@@ -70,6 +72,12 @@ impl OwnedObjects {
 
         Ok(())
     }
+    
+        pub async fn switch_multisig(&mut self, multisig_id: Address) -> Result<()> {
+            self.multisig_id = multisig_id;
+            self.refresh().await?;
+            Ok(())
+        }
 
     pub fn get_type_by_id(&self, id: Address) -> Option<String> {
         for coin in &self.coins {
