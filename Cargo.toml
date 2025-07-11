@@ -12,9 +12,9 @@ description = "Account Multisig SDK"
 move-binding-derive = { git = "https://github.com/thounyy/move-binding" }
 move-types = { git = "https://github.com/thounyy/move-binding" }
 
-sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="f0c8068" }
-sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="f0c8068", features = ["serde"] }
-sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="f0c8068" }
+sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="d3334e5" }
+sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="d3334e5", features = ["serde"] }
+sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="d3334e5" }
 
 tokio = { version = "1.45", features = ["full"] }
 anyhow = "1.0"
@@ -25,6 +25,6 @@ cynic = "3.11.0"
 serde_json = "1.0.140"
 
 [dev-dependencies]
-sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="f0c8068", features = ["ed25519"] }
+sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="d3334e5", features = ["ed25519"] }
 base64ct = { version = "1.6", features = ["std"] }
 rand = "0.8.0"
