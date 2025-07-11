@@ -4,8 +4,9 @@ pub mod move_binding;
 pub mod multisig;
 pub mod user;
 pub mod utils;
+pub mod multisig_builder;
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 use anyhow::{anyhow, Ok, Result};
 use move_types::{Key, MoveType, functions::Arg};
 use sui_graphql_client::Client;
@@ -17,9 +18,6 @@ use crate::proposals::{actions::IntentActions, params::{self, ParamsArgs}, inten
 use crate::assets::{dynamic_fields::DynamicFields, owned_objects::OwnedObjects};
 use crate::multisig::Multisig;
 use crate::user::User;
-
-// TODO: MultisigCreateBuilder
-// TODO: User
 
 static ACCOUNT_MULTISIG_PACKAGE: &str =
     "0x460632ef4e9e708658788229531b99f1f3285de06e1e50e98a22633c7e494867";
@@ -75,7 +73,10 @@ impl MultisigClient {
 
     // === Multisig ===
 
-    pub async fn create_multisig(&self, builder: &mut TransactionBuilder) -> Result<()> {
+    pub async fn create_multisig(
+        &self,
+        builder: &mut TransactionBuilder,
+    ) -> Result<Arg<ap::account::Account<am::multisig::Multisig>>> {
         let fee_obj = utils::get_object(&self.sui_client, Address::from_hex(FEE_OBJECT)?).await?;
         let fee = if let ObjectData::Struct(obj) = fee_obj.data() {
             bcs::from_bytes::<am::fees::Fees>(obj.contents())
@@ -97,9 +98,7 @@ impl MultisigClient {
             coin_arg.into(),
         );
 
-        sui::transfer::public_share_object(builder, account_obj);
-
-        Ok(())
+        Ok(account_obj)
     }
 
     pub async fn load_multisig(&mut self, id: Address) -> Result<()> {
@@ -150,20 +149,6 @@ impl MultisigClient {
 
     // === Commands ===
 
-    pub async fn deposit_cap<CapType: Key>(
-        &self,
-        builder: &mut TransactionBuilder,
-        cap_id: Address,
-    ) -> Result<()> {
-        let mut ms_arg = self.multisig_arg(builder).await?;
-        let cap_arg = self.owned_arg::<CapType>(builder, cap_id).await?;
-
-        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        aa::access_control::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg);
-
-        Ok(())
-    }
-
     pub async fn replace_metadata(
         &self,
         builder: &mut TransactionBuilder,
@@ -194,6 +179,20 @@ impl MultisigClient {
             ms_arg.borrow_mut(),
             extensions_arg.borrow(),
         );
+
+        Ok(())
+    }
+
+    pub async fn deposit_cap<CapType: Key>(
+        &self,
+        builder: &mut TransactionBuilder,
+        cap_id: Address,
+    ) -> Result<()> {
+        let mut ms_arg = self.multisig_arg(builder).await?;
+        let cap_arg = self.owned_arg::<CapType>(builder, cap_id).await?;
+
+        let auth = am::multisig::authenticate(builder, ms_arg.borrow());
+        aa::access_control::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg);
 
         Ok(())
     }
@@ -1742,6 +1741,16 @@ impl MultisigClient {
         Ok((multisig, expired, executions_count))
     }
 }
+
+impl fmt::Debug for MultisigClient {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("MultisigClient")
+            .field("user", &self.user)
+            .field("multisig", &self.multisig)
+            .finish()
+    }
+}
+
 
 #[macro_export]
 macro_rules! define_move_type {

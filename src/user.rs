@@ -14,7 +14,7 @@ use crate::utils;
 pub struct User {
     pub sui_client: Arc<Client>,
     pub address: Address,
-    pub id: ObjectId,
+    pub id: Option<ObjectId>,
     pub profile: Profile,
     pub multisigs: Vec<MultisigPreview>,
     pub invites: Vec<Invite>,
@@ -46,7 +46,7 @@ impl User {
         let mut user = Self {
             sui_client,
             address,
-            id: "0x0".parse().unwrap(),
+            id: None,
             profile: Profile {
                 username: "".to_string(),
                 avatar: "".to_string(),
@@ -61,7 +61,7 @@ impl User {
     pub async fn refresh(&mut self) -> Result<()> {
         let user = self.fetch_user_object().await?;
         if let Some(user) = user {
-            self.id = user.id;
+            self.id = Some(user.id);
             self.multisigs = self.fetch_previews(&user).await?;
         }
 
@@ -193,39 +193,80 @@ impl User {
         Ok(invites)
     }
 
-    pub async fn create_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
-        if self.id != "0x0".parse().unwrap() {
+    pub async fn create_user(
+        &self,
+        builder: &mut TransactionBuilder,
+    ) -> Result<Arg<ap::user::User>> {
+        if self.id.is_some() {
             return Err(anyhow::anyhow!("User already exists"));
         }
         let user = ap::user::new(builder);
-        let address = builder.input(Serialized(&self.address));
-        builder.transfer_objects(vec![user.into()], address);
-        Ok(())
+        Ok(user)
     }
 
-    pub async fn transfer_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
+    pub async fn transfer_user(
+        &self,
+        builder: &mut TransactionBuilder,
+        user: Arg<ap::user::User>,
+    ) -> Result<()> {
+        if self.id.is_none() {
+            return Err(anyhow::anyhow!("User not found"));
+        }
         let mut registry = self.registry_arg(builder).await?;
-        let user = self.user_arg(builder).await?;
         let address = builder.input(Serialized(&self.address));
         ap::user::transfer(builder, registry.borrow_mut(), user, address.into());
         Ok(())
     }
 
     pub async fn delete_user(&self, builder: &mut TransactionBuilder) -> Result<()> {
+        if self.id.is_none() {
+            return Err(anyhow::anyhow!("User not found"));
+        }
         let mut registry = self.registry_arg(builder).await?;
-        let user = self.user_arg(builder).await?;
+        let user = self
+            .user_arg(builder, *self.id.unwrap().as_address())
+            .await?;
         ap::user::destroy(builder, registry.borrow_mut(), user);
         Ok(())
     }
 
-    pub async fn accept_invite(&self, builder: &mut TransactionBuilder, invite_id: Address) -> Result<()> {
-        let mut user = self.user_arg(builder).await?;
-        let invite = self.invite_arg(builder, invite_id).await?;
-        ap::user::accept_invite(builder, user.borrow_mut(), invite);
+    pub async fn send_invite(
+        &self,
+        builder: &mut TransactionBuilder,
+        multisig: &Arg<ap::account::Account<am::multisig::Multisig>>,
+        recipient: Address,
+    ) -> Result<()> {
+        let recipient_arg = builder.input(Serialized(&recipient));
+        am::multisig::send_invite(builder, multisig.borrow(), recipient_arg.into());
         Ok(())
     }
 
-    pub async fn refuse_invite(&self, builder: &mut TransactionBuilder, invite_id: Address) -> Result<()> {
+    pub async fn accept_invite(
+        &self,
+        builder: &mut TransactionBuilder,
+        invite_id: Address,
+    ) -> Result<()> {
+        let mut user = if self.id.is_none() {
+            self.create_user(builder).await?
+        } else {
+            self.user_arg(builder, *self.id.unwrap().as_address())
+                .await?
+        };
+        let invite = self.invite_arg(builder, invite_id).await?;
+
+        ap::user::accept_invite(builder, user.borrow_mut(), invite);
+
+        if self.id.is_none() {
+            self.transfer_user(builder, user).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn refuse_invite(
+        &self,
+        builder: &mut TransactionBuilder,
+        invite_id: Address,
+    ) -> Result<()> {
         let invite = self.invite_arg(builder, invite_id).await?;
         ap::user::refuse_invite(builder, invite);
         Ok(())
@@ -246,9 +287,9 @@ impl User {
     pub async fn user_arg(
         &self,
         builder: &mut TransactionBuilder,
+        user_id: Address,
     ) -> Result<Arg<ap::user::User>> {
-        let user_input =
-            utils::get_object_as_input(&self.sui_client, *self.id.as_address()).await?;
+        let user_input = utils::get_object_as_input(&self.sui_client, user_id).await?;
         let user_arg = builder.input(user_input.by_val()).into();
         Ok(user_arg)
     }
@@ -258,8 +299,7 @@ impl User {
         builder: &mut TransactionBuilder,
         invite_id: Address,
     ) -> Result<Arg<ap::user::Invite>> {
-        let invite_input =
-            utils::get_object_as_input(&self.sui_client, invite_id).await?;
+        let invite_input = utils::get_object_as_input(&self.sui_client, invite_id).await?;
         let invite_arg = builder.input(invite_input.by_val()).into();
         Ok(invite_arg)
     }

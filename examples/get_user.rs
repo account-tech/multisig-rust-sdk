@@ -1,6 +1,5 @@
 use anyhow::Result;
 use move_types::Address;
-use sui_graphql_client::Client;
 
 use account_multisig_sdk::MultisigClient;
 
