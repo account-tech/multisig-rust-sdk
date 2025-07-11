@@ -10,10 +10,10 @@ use account_multisig_sdk::{MultisigBuilder, MultisigClient};
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut client = MultisigClient::new_testnet();
-    let builder = init_tx(client.sui()).await;
+    let mut builder = init_tx(client.sui()).await;
     client.load_user("0x3c00d56434d581fdfd6e280626f7c8ee75cc9dac134d84290491e65f9b8b7161".parse().unwrap()).await?;
 
-    let (client, builder) = MultisigBuilder::new(client, builder)
+    MultisigBuilder::new(&mut client, &mut builder)
         .set_name("test")
         .set_global_threshold(1)
         .add_member("0x3c00d56434d581fdfd6e280626f7c8ee75cc9dac134d84290491e65f9b8b7161", 1, vec!["f477dbfad6ab1de1fdcb6042c0afeda2aa5bf12eb7ef42d280059fc8d6c36c94::currency_intents"])

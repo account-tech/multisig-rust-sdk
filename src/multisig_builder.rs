@@ -8,9 +8,9 @@ use crate::{
     MultisigClient,
 };
 
-pub struct MultisigBuilder {
-    pub client: MultisigClient,
-    pub builder: TransactionBuilder,
+pub struct MultisigBuilder<'a> {
+    pub client: &'a mut MultisigClient,
+    pub builder: &'a mut TransactionBuilder,
     pub name: Option<String>,
     pub config: Option<Config>,
 }
@@ -25,8 +25,8 @@ pub struct Config {
     pub role_thresholds: Vec<u64>,
 }
 
-impl MultisigBuilder {
-    pub fn new(client: MultisigClient, builder: TransactionBuilder) -> Self {
+impl<'a> MultisigBuilder<'a> {
+    pub fn new(client: &'a mut MultisigClient, builder: &'a mut TransactionBuilder) -> Self {
         Self {
             client,
             builder,
@@ -86,10 +86,10 @@ impl MultisigBuilder {
         self
     }
 
-    pub async fn build(self) -> Result<(MultisigClient, TransactionBuilder)> {
+    pub async fn build(self) -> Result<()> {
         let Self {
             client,
-            mut builder,
+            builder,
             name,
             config,
         } = self;
@@ -99,28 +99,28 @@ impl MultisigBuilder {
         }
 
         let mut user = if client.user().unwrap().id.is_none() {
-            client.user().unwrap().create_user(&mut builder).await?
+            client.user().unwrap().create_user(builder).await?
         } else {
             client
                 .user()
                 .unwrap()
                 .user_arg(
-                    &mut builder,
+                    builder,
                     *client.user().unwrap().id.unwrap().as_address(),
                 )
                 .await?
         };
 
-        let mut multisig = client.create_multisig(&mut builder).await?;
+        let mut multisig = client.create_multisig(builder).await?;
 
         // set name if provided
         if let Some(name) = name {
-            let keys_arg = client.pure_arg(&mut builder, vec![String::from("name")])?;
-            let values_arg = client.pure_arg(&mut builder, vec![name.to_string()])?;
+            let keys_arg = client.pure_arg(builder, vec![String::from("name")])?;
+            let values_arg = client.pure_arg(builder, vec![name.to_string()])?;
 
-            let auth = am::multisig::authenticate(&mut builder, multisig.borrow());
+            let auth = am::multisig::authenticate(builder, multisig.borrow());
             ap::config::edit_metadata(
-                &mut builder,
+                builder,
                 auth,
                 multisig.borrow_mut(),
                 keys_arg,
@@ -139,28 +139,28 @@ impl MultisigBuilder {
                 role_thresholds,
             } = config;
 
-            let clock = client.clock_arg(&mut builder).await?;
+            let clock = client.clock_arg(builder).await?;
             let params = ParamsArgs::new(
-                &mut builder,
+                builder,
                 "config_multisig".to_string(),
                 "".to_string(),
                 vec![0],
                 0,
             );
 
-            let auth = am::multisig::authenticate(&mut builder, multisig.borrow());
+            let auth = am::multisig::authenticate(builder, multisig.borrow());
             let params = ap::intents::new_params(
-                &mut builder,
+                builder,
                 params.key,
                 params.description,
                 params.execution_times,
                 params.expiration_time,
                 clock.borrow(),
             );
-            let outcome = am::multisig::empty_outcome(&mut builder);
+            let outcome = am::multisig::empty_outcome(builder);
 
             let action_args = ConfigMultisigArgs::new(
-                &mut builder,
+                builder,
                 addresses
                     .clone()
                     .iter()
@@ -174,7 +174,7 @@ impl MultisigBuilder {
             );
 
             am::config::request_config_multisig(
-                &mut builder,
+                builder,
                 auth,
                 multisig.borrow_mut(),
                 params,
@@ -187,56 +187,56 @@ impl MultisigBuilder {
                 action_args.role_thresholds,
             );
 
-            let key = client.key_arg(&mut builder, "config_multisig")?;
-            am::multisig::approve_intent(&mut builder, multisig.borrow_mut(), key);
+            let key = client.key_arg(builder, "config_multisig")?;
+            am::multisig::approve_intent(builder, multisig.borrow_mut(), key);
 
-            let key = client.key_arg(&mut builder, "config_multisig")?;
+            let key = client.key_arg(builder, "config_multisig")?;
             let mut executable = am::multisig::execute_intent(
-                &mut builder,
+                builder,
                 multisig.borrow_mut(),
                 key,
                 clock.borrow(),
             );
             am::config::execute_config_multisig(
-                &mut builder,
+                builder,
                 executable.borrow_mut(),
                 multisig.borrow_mut(),
             );
-            ap::account::confirm_execution(&mut builder, multisig.borrow_mut(), executable);
+            ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
-            let key = client.key_arg(&mut builder, "config_multisig")?;
+            let key = client.key_arg(builder, "config_multisig")?;
             let mut expired = ap::account::destroy_empty_intent::<
                 am::multisig::Multisig,
                 am::multisig::Approvals,
-            >(&mut builder, multisig.borrow_mut(), key);
+            >(builder, multisig.borrow_mut(), key);
 
-            am::config::delete_config_multisig(&mut builder, expired.borrow_mut());
-            ap::intents::destroy_empty_expired(&mut builder, expired);
+            am::config::delete_config_multisig(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
 
             for addr in addresses {
                 if addr == client.user().unwrap().address.to_string() {
                     // add multisig to User object
-                    am::multisig::join(&mut builder, user.borrow_mut(), multisig.borrow());
+                    am::multisig::join(builder, user.borrow_mut(), multisig.borrow());
                 } else {    
                     // send invite to other addresses
                     client
                         .user()
                         .unwrap()
-                        .send_invite(&mut builder, &multisig, addr.parse().unwrap())
+                        .send_invite(builder, &multisig, addr.parse().unwrap())
                         .await?;
                 }
             }
         }
         // transfer and share objects
-        sui::transfer::public_share_object(&mut builder, multisig);
+        sui::transfer::public_share_object(builder, multisig);
         if client.user().unwrap().id.is_none() {
             client
                 .user()
                 .unwrap()
-                .transfer_user(&mut builder, user)
+                .transfer_user(builder, user)
                 .await?;
         }
 
-        Ok((client, builder))
+        Ok(())
     }
 }
