@@ -103,7 +103,7 @@ impl MultisigClient {
         Ok(account_obj)
     }
 
-    pub async fn share_multisig(
+    pub fn share_multisig(
         &self, 
         builder: &mut TransactionBuilder, 
         multisig: Arg<ap::account::Account<am::multisig::Multisig>>
@@ -435,6 +435,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         am::config::execute_config_multisig(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -501,6 +502,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         ap::config::execute_config_deps(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -568,6 +570,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         ap::config::execute_toggle_unverified_allowed(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -656,17 +659,10 @@ impl MultisigClient {
         cap: Arg<Cap>,
         intent_key: &str,
     ) -> Result<()> {
-        aa::access_control_intents::execute_return_cap::<
-            am::multisig::Multisig,
-            am::multisig::Approvals,
-            Cap,
-        >(builder, executable.borrow_mut(), multisig.borrow_mut(), cap);
-
-        ap::account::confirm_execution::<am::multisig::Multisig, am::multisig::Approvals>(
-            builder,
-            multisig.borrow_mut(),
-            executable,
+        aa::access_control_intents::execute_return_cap::<_, _, Cap>(
+            builder, executable.borrow_mut(), multisig.borrow_mut(), cap
         );
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if self.intent(intent_key)?.execution_times.len() == 1 {
             let key_arg = self.key_arg(builder, intent_key)?;
@@ -736,6 +732,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         aa::currency_intents::execute_disable_rules::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -806,6 +803,7 @@ impl MultisigClient {
         aa::currency_intents::execute_update_metadata::<_, _, CoinType>(
             builder, executable.borrow_mut(), multisig.borrow_mut(), coin_metadata.borrow_mut()
         );
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -873,6 +871,7 @@ impl MultisigClient {
         for _ in 0..executions_count {
             aa::currency_intents::execute_mint_and_transfer::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
         }
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -944,6 +943,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         aa::currency_intents::execute_mint_and_vest::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1018,6 +1018,7 @@ impl MultisigClient {
 
         let receive_coin = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
         aa::currency_intents::execute_withdraw_and_burn(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_coin);
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1092,6 +1093,7 @@ impl MultisigClient {
 
         let receive_coin = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
         aa::owned_intents::execute_withdraw_and_transfer_to_vault(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_coin);
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1181,6 +1183,7 @@ impl MultisigClient {
                 vec![executable.borrow_mut().into(), multisig.borrow_mut().into(), receive_id],
             );
         }
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1257,6 +1260,7 @@ impl MultisigClient {
         };
         let receive_id = self.receive_arg::<sui::coin::Coin<CoinType>>(builder, coin_id).await?;
         aa::owned_intents::execute_withdraw_and_vest(builder, executable.borrow_mut(), multisig.borrow_mut(), receive_id);
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1340,6 +1344,7 @@ impl MultisigClient {
         aa::package_upgrade_intents::execute_commit_upgrade(
             builder, executable.borrow_mut(), multisig.borrow_mut(), receipt.into()
         );
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if intent.execution_times.len() == 1 {
             let key = self.key_arg(builder, intent_key)?;
@@ -1409,6 +1414,7 @@ impl MultisigClient {
         for _ in 0..executions_count {
             aa::vault_intents::execute_spend_and_transfer::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
         }
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1481,6 +1487,7 @@ impl MultisigClient {
         ) = self.prepare_execute(builder, intent_key).await?;
 
         aa::vault_intents::execute_spend_and_vest::<_, _, CoinType>(builder, executable.borrow_mut(), multisig.borrow_mut());
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
 
         if is_last_execution {
             let key = self.key_arg(builder, intent_key)?;
@@ -1927,7 +1934,8 @@ mod tests {
         let mut client = MultisigClient::new_testnet();
         let (pk, mut builder) = init_tx(client.sui()).await;
 
-        client.create_multisig(&mut builder).await.unwrap();
+        let multisig = client.create_multisig(&mut builder).await.unwrap();
+        client.share_multisig(&mut builder, multisig);
         let effects = execute_tx(client.sui(), pk, builder).await;
 
         let multisig_id = get_created_multisig(&effects).await;

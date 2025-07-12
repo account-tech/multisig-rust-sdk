@@ -12,7 +12,8 @@ async fn test_config_multisig_intent() {
     // TX 1: Create multisig
     let multisig_id = {
         let (pk, mut builder) = init_tx(client.sui()).await;
-        client.create_multisig(&mut builder).await.unwrap();
+        let multisig = client.create_multisig(&mut builder).await.unwrap();
+        client.share_multisig(&mut builder, multisig);
         let effects = execute_tx(client.sui(), pk, builder).await;
         get_created_multisig(&effects).await
     };

@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
 
     let mut builder = init_tx(client.sui()).await;
     let multisig = client.create_multisig(&mut builder).await?;
-    client.share_multisig(&mut builder, multisig).await;
+    client.share_multisig(&mut builder, multisig);
 
     execute_tx(client.sui(), builder).await;
 
