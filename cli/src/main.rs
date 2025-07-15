@@ -1,11 +1,15 @@
-use account_multisig_cli::commands::intent::IntentCommands;
-use account_multisig_sdk::{MultisigClient, multisig_builder::Config};
-use anyhow::Result;
+use account_multisig_cli::commands::{create::create_multisig, intent::IntentCommands};
+use account_multisig_sdk::MultisigClient;
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use std::io::{self, Write};
 use sui_config::{SUI_CLIENT_CONFIG, sui_config_dir};
+use sui_crypto::ed25519::Ed25519PrivateKey;
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::wallet_context::WalletContext;
+use sui_sdk::{
+    types::crypto::{SuiKeyPair, ToFromBytes},
+    wallet_context::WalletContext,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "account-multisig", version, about, long_about = None)]
@@ -18,6 +22,8 @@ struct App {
 enum Commands {
     #[command(name = "exit", about = "Exit the CLI")]
     Exit,
+    // #[command(name = "user", about = "Manage user")]
+    // UserCommands
     #[command(name = "load", about = "Load a multisig data and cache it")]
     Load { id: String },
     #[command(name = "create", about = "Create a new multisig")]
@@ -58,6 +64,12 @@ async fn main() -> Result<()> {
     let active_addr = wallet_context.active_address()?;
     let signer = wallet_context.config.keystore.get_key(&active_addr)?;
 
+    let bytes = match signer {
+        SuiKeyPair::Ed25519(kp) => Ok(kp.as_bytes()),
+        _ => Err(anyhow!("Only ed25519 keys are supported")),
+    };
+    let ed25519_pk = Ed25519PrivateKey::new(bytes?.try_into()?);
+
     let network = std::env::args().nth(1).unwrap_or("mainnet".to_string());
     let mut client = match network.as_str() {
         "testnet" => MultisigClient::new_testnet(),
@@ -83,7 +95,9 @@ async fn main() -> Result<()> {
         }
 
         let args: Vec<&str> = input.split_whitespace().collect();
-        match App::try_parse_from(args) {
+        let mut clap_args = vec!["acc-multisig"];
+        clap_args.extend(args);
+        match App::try_parse_from(clap_args) {
             Ok(app) => {
                 match app.command {
                     Commands::Exit => {
@@ -101,7 +115,18 @@ async fn main() -> Result<()> {
                         role_names,
                         role_thresholds,
                     } => {
-                        // create multisig
+                        create_multisig(
+                            &client,
+                            &ed25519_pk,
+                            name,
+                            addresses,
+                            weights,
+                            roles,
+                            global_threshold,
+                            role_names,
+                            role_thresholds,
+                        )
+                        .await?;
                     }
                     Commands::Intents {
                         key,

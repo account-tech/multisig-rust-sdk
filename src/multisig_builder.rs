@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub struct MultisigBuilder<'a> {
-    pub client: &'a mut MultisigClient,
+    pub client: &'a MultisigClient,
     pub builder: &'a mut TransactionBuilder,
     pub name: Option<String>,
     pub config: Option<Config>,
@@ -26,7 +26,7 @@ pub struct Config {
 }
 
 impl<'a> MultisigBuilder<'a> {
-    pub fn new(client: &'a mut MultisigClient, builder: &'a mut TransactionBuilder) -> Self {
+    pub fn new(client: &'a MultisigClient, builder: &'a mut TransactionBuilder) -> Self {
         Self {
             client,
             builder,

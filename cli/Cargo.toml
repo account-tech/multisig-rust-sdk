@@ -13,7 +13,6 @@ sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "su
 sui-sdk = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
 sui-config = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
 sui-keys = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
-base64ct = { version = "1.6", features = ["std"] }
 # workspace dependencies
 sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="d3334e5" }
 sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="d3334e5", features = ["serde"] }
