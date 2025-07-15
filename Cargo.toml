@@ -1,12 +1,18 @@
 [package]
 name = "account-multisig-sdk"
+description = "Account Multisig SDK"
 version = "0.1.0"
 authors = ["Thouny <thouny@tuta.io>"]
 repository = "https://github.com/account-tech/multisig-rust-sdk/"
 license = "Apache-2.0"
 edition = "2021"
 readme = "README.md"
-description = "Account Multisig SDK"
+
+[workspace]
+members = [
+    ".",
+    "cli"
+]
 
 [dependencies]
 move-binding-derive = { git = "https://github.com/thounyy/move-binding" }
@@ -19,10 +25,10 @@ sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", 
 tokio = { version = "1.45", features = ["full"] }
 anyhow = "1.0"
 serde = "1.0"
+serde_json = "1.0"
 bcs = "0.1.6"
 paste = "1.0.15"
 cynic = "3.11.0"
-serde_json = "1.0.140"
 
 [dev-dependencies]
 sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="d3334e5", features = ["ed25519"] }

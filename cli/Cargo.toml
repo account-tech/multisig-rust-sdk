@@ -1,0 +1,16 @@
+[package]
+name = "account-multisig-cli"
+description = "CLI for interacting with Account Multisig Packages on Sui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+account-multisig-sdk = { path = "../" }
+clap = { version = "4.5", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# workspace dependencies
+tokio = { version = "1.45", features = ["full"] }
+anyhow = "1.0"
+serde = "1.0"
+serde_json = "1.0"
