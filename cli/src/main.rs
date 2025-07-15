@@ -52,8 +52,13 @@ async fn main() -> Result<()> {
     
     println!("Multisig CLI - Interactive Mode");
     println!("Type 'help' for commands, 'exit' to quit");
-
-    let mut client = MultisigClient::new_testnet();
+    
+    let network = std::env::args().nth(1).unwrap_or("mainnet".to_string());
+    let mut client = match network.as_str() {
+        "testnet" => MultisigClient::new_testnet(),
+        "mainnet" => MultisigClient::new_mainnet(),
+        url => MultisigClient::new_with_url(url)?,
+    };
     
     loop {
         print!("multisig> ");
@@ -71,7 +76,6 @@ async fn main() -> Result<()> {
             break;
         }
         
-        // Use Clap to parse the command
         let args: Vec<&str> = input.split_whitespace().collect();
         match App::try_parse_from(args) {
             Ok(app) => {
@@ -80,7 +84,7 @@ async fn main() -> Result<()> {
                         break;
                     },
                     Commands::Load { id } => {
-                        // load multisig
+                        client.load_multisig(id.parse().unwrap()).await?;
                     },
                     Commands::Create { name, addresses, weights, roles, global_threshold, role_names, role_thresholds } => {
                         // create multisig
