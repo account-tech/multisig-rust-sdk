@@ -1382,6 +1382,82 @@ impl MultisigClient {
         Ok(())
     }
 
+    pub async fn request_restrict_policy(
+        &self,
+        builder: &mut TransactionBuilder,
+        intent_args: ParamsArgs,
+        actions_args: params::RestrictPolicyArgs,
+    ) -> Result<()> {
+        let (
+            mut multisig, 
+            auth, 
+            params, 
+            outcome
+        ) = self.prepare_request(builder, intent_args).await?;
+
+        aa::package_upgrade_intents::request_restrict_policy(
+            builder,auth,multisig.borrow_mut(),params,outcome,
+            actions_args.package_name,actions_args.policy,
+        );
+
+        Ok(())
+    }
+
+    pub async fn execute_restrict_policy(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let mut multisig = self.multisig_arg(builder).await?;
+        let clock = self.clock_arg(builder).await?;
+        let key = self.key_arg(builder, intent_key)?;
+        
+        let intent = self.intent(intent_key)?;
+        let current_timestamp = self.clock_timestamp().await?;
+        if current_timestamp < *intent.execution_times.first().unwrap() {
+            return Err(anyhow!("Intent cannot be executed"));
+        }
+        
+        let mut executable = am::multisig::execute_intent(
+            builder, multisig.borrow_mut(), key, clock.borrow(),
+        );
+
+        aa::package_upgrade_intents::execute_restrict_policy(
+            builder, executable.borrow_mut(), multisig.borrow_mut()
+        );
+        ap::account::confirm_execution(builder, multisig.borrow_mut(), executable);
+
+        if intent.execution_times.len() == 1 {
+            let key = self.key_arg(builder, intent_key)?;
+            let mut expired = ap::account::destroy_empty_intent::<
+                am::multisig::Multisig,
+                am::multisig::Approvals,
+            >(builder, multisig.borrow_mut(), key);
+
+            ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
+            aa::vesting::delete_vest(builder, expired.borrow_mut());
+            ap::intents::destroy_empty_expired(builder, expired);
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_restrict_policy(
+        &mut self,
+        builder: &mut TransactionBuilder,
+        intent_key: &str,
+    ) -> Result<()> {
+        let (
+            _multisig, 
+            mut expired, 
+            _executions_count
+        ) = self.prepare_delete(builder, intent_key).await?;
+
+        aa::package_upgrade::delete_restrict(builder, expired.borrow_mut());
+
+        Ok(())
+    }
+
     pub async fn request_spend_and_transfer<CoinType: MoveType>(
         &self,
         builder: &mut TransactionBuilder,

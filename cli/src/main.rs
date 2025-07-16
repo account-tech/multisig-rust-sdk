@@ -1,4 +1,4 @@
-use account_multisig_cli::commands::{create::create_multisig, intent::IntentCommands};
+use account_multisig_cli::commands::{create::create_multisig, proposal::ProposalCommands};
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
@@ -43,11 +43,13 @@ enum Commands {
         #[arg(long)]
         role_thresholds: Option<Vec<u64>>,
     },
-    #[command(name = "intents", about = "Manage intents")]
-    Intents {
+    #[command(name = "proposals", about = "Display proposals, pass key to operate on")]
+    Proposals {
+        /// Proposal key to operate on. If not provided, lists all proposals.
+        /// If provided without a subcommand, shows proposal details.
         key: Option<String>,
         #[command(subcommand)]
-        intent_command: Option<IntentCommands>,
+        proposal_command: Option<ProposalCommands>,
     },
 }
 #[tokio::main]
@@ -138,12 +140,12 @@ async fn main() -> Result<()> {
                         )
                         .await?;
                     }
-                    Commands::Intents {
+                    Commands::Proposals {
                         key,
-                        intent_command,
+                        proposal_command,
                     } => {
-                        match (key, intent_command) {
-                            (Some(key), Some(intent_command)) => {
+                        match (key, proposal_command) {
+                            (Some(key), Some(proposal_command)) => {
                                 // assert key
                                 // match command
                             }
