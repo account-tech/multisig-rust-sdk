@@ -39,6 +39,7 @@ dependencies = [
  "serde_json",
  "sui-crypto",
  "sui-graphql-client",
+ "sui-graphql-client-build",
  "sui-sdk-types 0.0.5",
  "sui-transaction-builder 0.0.5",
  "tokio",

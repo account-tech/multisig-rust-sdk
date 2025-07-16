@@ -789,7 +789,6 @@ impl MultisigClient {
         &mut self,
         builder: &mut TransactionBuilder,
         intent_key: &str,
-        coin_metadata_id: Address,
     ) -> Result<()> {
         let (
             mut multisig, 
@@ -798,8 +797,13 @@ impl MultisigClient {
             _executions_count
         ) = self.prepare_execute(builder, intent_key).await?;
 
+        let coin_type = CoinType::type_().to_string();
+        let coin_metadata_object = utils::coin_metadata(self.sui(), &coin_type)
+            .await?
+            .ok_or(anyhow!("Coin metadata object not found"))?;
+
         let mut coin_metadata = 
-            self.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_id).await?;
+            self.shared_mut_arg::<sui::coin::CoinMetadata<CoinType>>(builder, coin_metadata_object.address.clone()).await?;
         aa::currency_intents::execute_update_metadata::<_, _, CoinType>(
             builder, executable.borrow_mut(), multisig.borrow_mut(), coin_metadata.borrow_mut()
         );

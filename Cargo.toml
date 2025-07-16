@@ -34,3 +34,6 @@ cynic = "3.11.0"
 sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="d3334e5", features = ["ed25519"] }
 base64ct = { version = "1.6", features = ["std"] }
 rand = "0.8.0"
+
+[build-dependencies]
+sui-graphql-client-build = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client-build", rev="d3334e5" }
