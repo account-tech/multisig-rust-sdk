@@ -90,10 +90,6 @@ async fn main() -> Result<()> {
             continue;
         }
 
-        if input == "exit" || input == "quit" {
-            break;
-        }
-
         let args: Vec<&str> = input.split_whitespace().collect();
         let mut clap_args = vec!["acc-multisig"];
         clap_args.extend(args);
@@ -103,6 +99,7 @@ async fn main() -> Result<()> {
                     Commands::Exit => {
                         break;
                     }
+                    // Commands::U
                     Commands::Load { id } => {
                         client.load_multisig(id.parse().unwrap()).await?;
                     }
@@ -138,10 +135,34 @@ async fn main() -> Result<()> {
                                 // match command
                             }
                             (Some(key), None) => {
-                                // get intent
+                                let intent = client.intent_mut(key.as_str())?;
+                                println!("\n=== DETAILS ===\n");
+                                println!("Name: {}", intent.key);
+                                println!("Type: {}", intent.type_);
+                                println!("Description: {}", intent.description);
+                                println!("Multisig: {}", intent.account);
+                                println!("Creator: {}", intent.creator);
+                                println!("Creation time: {}", intent.creation_time);
+                                print!("Execution times: ");
+                                for time in &intent.execution_times {
+                                    print!("{} ", time);
+                                }
+                                println!();
+                                println!("Expiration time: {}", intent.expiration_time);
+                                println!("Role: {}", intent.role);
+                                println!("\n=== CURRENT OUTCOME ===\n");
+                                println!("Total weight: {}", intent.outcome.total_weight);
+                                println!("Role weight: {}", intent.outcome.role_weight);
+                                print!("Approved by: ");
+                                for address in &intent.outcome.approved {
+                                    print!("{}", address);
+                                }
+                                let actions = intent.get_actions_args().await?;
+                                println!("\n\n=== ACTIONS ===\n");
+                                println!("{:#?}", actions);
                             }
                             (None, None) => {
-                                // list intents
+                                println!("{}", client.intents().unwrap());
                             }
                             _ => {
                                 eprintln!("Invalid command");

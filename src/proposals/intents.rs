@@ -154,7 +154,9 @@ impl Intent {
 
 impl fmt::Display for Intent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Intent: {}", self.key)
+        writeln!(f, "Name: {}", self.key)?;
+        writeln!(f, "Type: {}", self.type_)?;
+        fmt::Result::Ok(())
     }
 }
 
