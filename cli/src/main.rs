@@ -24,8 +24,8 @@ enum Commands {
     Exit,
     // #[command(name = "user", about = "Manage user")]
     // UserCommands
-    #[command(name = "load", about = "Load a multisig data and cache it")]
-    Load { id: String },
+    #[command(name = "load", about = "Load a specific multisig or reload current")]
+    Load { id: Option<String> },
     #[command(name = "create", about = "Create a new multisig")]
     Create {
         #[arg(long)]
@@ -82,7 +82,9 @@ async fn main() -> Result<()> {
     };
     client.load_user(active_addr.to_inner().into()).await?;
     if let Some(id) = std::env::args().nth(2) {
-        client.load_multisig(id.parse().map_err(|_| anyhow!("Invalid multisig id"))?).await?;
+        client
+            .load_multisig(id.parse().map_err(|_| anyhow!("Invalid multisig id"))?)
+            .await?;
     }
 
     loop {
@@ -108,7 +110,11 @@ async fn main() -> Result<()> {
                     }
                     // Commands::U
                     Commands::Load { id } => {
-                        client.load_multisig(id.parse().unwrap()).await?;
+                        if let Some(id) = id {
+                            client.load_multisig(id.parse()?).await?;
+                        } else {
+                            client.refresh().await?;
+                        }
                     }
                     Commands::Create {
                         name,
