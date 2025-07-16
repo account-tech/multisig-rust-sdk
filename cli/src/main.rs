@@ -59,6 +59,7 @@ async fn main() -> Result<()> {
     println!("Multisig CLI - Interactive Mode");
     println!("Type 'help' for commands, 'exit' to quit");
 
+    // get keypair from sui_config
     let mut wallet_context =
         WalletContext::new(&sui_config_dir()?.join(SUI_CLIENT_CONFIG), None, None)?;
     let active_addr = wallet_context.active_address()?;
@@ -70,13 +71,19 @@ async fn main() -> Result<()> {
     };
     let ed25519_pk = Ed25519PrivateKey::new(bytes?.try_into()?);
 
-    let network = std::env::args().nth(1).unwrap_or("mainnet".to_string());
+    // init cli with network and multisig id
+    let network = std::env::args().nth(1).ok_or(anyhow!(
+        "Network not specified: 'mainnet' 'testnet' or '<url>'"
+    ))?;
     let mut client = match network.as_str() {
         "testnet" => MultisigClient::new_testnet(),
         "mainnet" => MultisigClient::new_mainnet(),
         url => MultisigClient::new_with_url(url)?,
     };
     client.load_user(active_addr.to_inner().into()).await?;
+    if let Some(id) = std::env::args().nth(2) {
+        client.load_multisig(id.parse().map_err(|_| anyhow!("Invalid multisig id"))?).await?;
+    }
 
     loop {
         print!("multisig> ");
