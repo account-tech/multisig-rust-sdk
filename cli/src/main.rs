@@ -146,8 +146,7 @@ async fn main() -> Result<()> {
                     } => {
                         match (key, proposal_command) {
                             (Some(key), Some(proposal_command)) => {
-                                // assert key
-                                // match command
+                                proposal_command.run(&mut client, &ed25519_pk, key.as_str()).await?;
                             }
                             (Some(key), None) => {
                                 let intent = client.intent_mut(key.as_str())?;
