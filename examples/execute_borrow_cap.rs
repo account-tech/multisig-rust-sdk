@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     let mut builder = init_tx(client.sui()).await;
 
     let (multisig, executable, cap) = client
-        .execute_borrow_cap(&mut builder, "borrow_cap", "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap")
+        .execute_borrow_cap(&mut builder, "borrow_cap")
         .await?;
 
     // do something with the cap then return it
@@ -30,8 +30,7 @@ async fn main() -> Result<()> {
             multisig,
             executable,
             cap,
-            "borrow_cap",
-            "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
+            "borrow_cap"
         )
         .await?;
 

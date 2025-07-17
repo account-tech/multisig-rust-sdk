@@ -6,6 +6,8 @@ use crate::move_binding::account_actions as aa;
 use crate::move_binding::account_multisig as am;
 use crate::move_binding::account_protocol as ap;
 
+// === IntentActions ===
+
 #[derive(Debug, Clone)]
 pub enum IntentActions {
     ConfigMultisig(ConfigMultisigFields),
@@ -180,6 +182,45 @@ impl TryFrom<u8> for Policy {
         }
     }
 }
+
+impl IntentActions {
+    pub fn asset_type(&self) -> Result<TypeTag> {
+        match self {
+            IntentActions::ConfigMultisig(_) => {
+                Err(anyhow!("ConfigMultisig does not have an asset type"))
+            }
+            IntentActions::ConfigDeps(_) => Err(anyhow!("ConfigDeps does not have an asset type")),
+            IntentActions::ToggleUnverifiedAllowed(_) => Err(anyhow!(
+                "ToggleUnverifiedAllowed does not have an asset type"
+            )),
+            IntentActions::BorrowCap(fields) => Ok(fields.cap_type.parse()?),
+            IntentActions::DisableRules(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::UpdateMetadata(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::MintAndTransfer(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::MintAndVest(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::WithdrawAndBurn(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::TakeNfts(_) => Err(anyhow!("TakeNfts does not have an asset type")),
+            IntentActions::ListNfts(_) => Err(anyhow!("ListNfts does not have an asset type")),
+            IntentActions::WithdrawAndTransferToVault(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::WithdrawAndTransfer(_) => {
+                Err(anyhow!("WithdrawAndTransfer does not have an asset type"))
+            }
+            IntentActions::WithdrawAndVest(_) => {
+                Err(anyhow!("WithdrawAndVest does not have an asset type"))
+            }
+            IntentActions::SpendAndTransfer(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::SpendAndVest(fields) => Ok(fields.coin_type.parse()?),
+            IntentActions::UpgradePackage(_) => {
+                Err(anyhow!("UpgradePackage does not have an asset type"))
+            }
+            IntentActions::RestrictPolicy(_) => {
+                Err(anyhow!("RestrictPolicy does not have an asset type"))
+            }
+        }
+    }
+}
+
+// === IntentType ===
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum IntentType {
