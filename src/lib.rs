@@ -12,7 +12,7 @@ use std::{fmt, sync::Arc};
 use anyhow::{anyhow, Ok, Result};
 use move_types::{Key, MoveType, functions::Arg};
 use sui_graphql_client::Client;
-use sui_sdk_types::{Address, ObjectData, ObjectId};
+use sui_sdk_types::{Address, Argument, ObjectData, ObjectId};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder, Function, Serialized};
 
 use crate::move_binding::{account_actions as aa, account_extensions as ae, account_multisig as am, account_protocol as ap, sui};
@@ -200,63 +200,82 @@ impl MultisigClient {
         Ok(())
     }
 
-    pub async fn deposit_cap<CapType: Key>(
+    pub async fn deposit_cap(
         &self,
         builder: &mut TransactionBuilder,
         cap_id: Address,
+        cap_type: &str,
     ) -> Result<()> {
         let mut ms_arg = self.multisig_arg(builder).await?;
-        let cap_arg = self.owned_arg::<CapType>(builder, cap_id).await?;
+        let cap_argument = self.owned_argument(builder, cap_id).await?;
 
         let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        aa::access_control::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg);
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "access_control".parse().unwrap(),
+                "lock_cap".parse().unwrap(),
+                vec![cap_type.parse().unwrap()],
+            ),
+            vec![auth.into(), ms_arg.borrow_mut().into(), cap_argument],
+        );
 
         Ok(())
     }
 
-    pub async fn deposit_treasury_cap<CoinType: MoveType>(
+    pub async fn deposit_treasury_cap(
         &self,
         builder: &mut TransactionBuilder,
         max_supply: Option<u64>,
         cap_id: Address,
+        coin_type: &str,
     ) -> Result<()> {
         let mut ms_arg = self.multisig_arg(builder).await?;
         let max_supply_arg = self.pure_arg(builder, max_supply)?;
-        let cap_arg = self
-            .owned_arg::<sui::coin::TreasuryCap<CoinType>>(builder, cap_id)
-            .await?;
+        let cap_argument = self.owned_argument(builder, cap_id).await?;
 
         let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        aa::currency::lock_cap(builder, auth, ms_arg.borrow_mut(), cap_arg, max_supply_arg);
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "currency".parse().unwrap(),
+                "lock_cap".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![auth.into(), ms_arg.borrow_mut().into(), cap_argument, max_supply_arg.into()],
+        );
 
         Ok(())
     }
 
-    pub async fn merge_and_split<CoinType: MoveType>(
+    pub async fn merge_and_split(
         &self,
         builder: &mut TransactionBuilder,
         coins_to_merge: Vec<Address>,
         amounts_to_split: Vec<u64>,
-    ) -> Result<()> {
+        coin_type: &str,
+    ) -> Result<Argument> {
         let mut ms_arg = self.multisig_arg(builder).await?;
         let mut coin_inputs = Vec::new();
         for coin in coins_to_merge {
             coin_inputs.push(builder.input(self.obj(coin).await?.with_receiving_kind()));
         }
 
-        let to_merge_arg = builder.make_move_vec(None, coin_inputs).into();
-        let to_split_arg = self.pure_arg(builder, amounts_to_split)?;
+        let to_merge_argument = builder.make_move_vec(None, coin_inputs);
+        let to_split_argument = builder.input(Serialized(&amounts_to_split));
 
         let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        ap::owned::merge_and_split::<_, CoinType>(
-            builder,
-            auth,
-            ms_arg.borrow_mut(),
-            to_merge_arg,
-            to_split_arg,
+        let ids = builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_PROTOCOL_PACKAGE.parse().unwrap(),
+                "owned".parse().unwrap(),
+                "merge_and_split".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![auth.into(), ms_arg.borrow_mut().into(), to_merge_argument, to_split_argument],
         );
 
-        Ok(())
+        Ok(ids)
     }
 
     pub async fn deposit_upgrade_cap(
@@ -300,17 +319,26 @@ impl MultisigClient {
         Ok(())
     }
 
-    pub async fn deposit_from_wallet<CoinType: MoveType>(
+    pub async fn deposit_from_wallet(
         &self,
         builder: &mut TransactionBuilder,
-        vault_name: &str,
-        coin_arg: Arg<sui::coin::Coin<CoinType>>, // splitted in previous command
+        vault_name: String,
+        coin_argument: Argument, // splitted in previous command
+        coin_type: &str,
     ) -> Result<()> {
         let mut ms_arg = self.multisig_arg(builder).await?;
-        let vault_name_arg = self.pure_arg(builder, vault_name.to_string())?;
+        let vault_name_argument = builder.input(Serialized(&vault_name));
 
         let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        aa::vault::deposit(builder, auth, ms_arg.borrow_mut(), vault_name_arg, coin_arg);
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "vault".parse().unwrap(),
+                "deposit".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![auth.into(), ms_arg.borrow_mut().into(), vault_name_argument, coin_argument],
+        );
 
         Ok(())
     }
@@ -329,57 +357,72 @@ impl MultisigClient {
         Ok(())
     }
 
-    pub async fn claim_vested<CoinType: MoveType>(
+    pub async fn claim_vested(
         &self,
         builder: &mut TransactionBuilder,
         vesting_id: Address,
         cap_id: Address,
+        coin_type: &str,
     ) -> Result<()> {
-        let mut vesting_arg = self
-            .shared_mut_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
-            .await?;
+        let vesting_argument = self.shared_mut_argument(builder, vesting_id).await?;
         let cap_arg = self
             .owned_arg::<aa::vesting::ClaimCap>(builder, cap_id)
             .await?;
         let clock_arg = self.clock_arg(builder).await?;
 
-        aa::vesting::claim(
-            builder,
-            vesting_arg.borrow_mut(),
-            cap_arg.borrow(),
-            clock_arg.borrow(),
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "vesting".parse().unwrap(),
+                "claim".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![vesting_argument, cap_arg.borrow().into(), clock_arg.borrow().into()],
         );
 
         Ok(())
     }
 
-    pub async fn cancel_vesting<CoinType: MoveType>(
+    pub async fn cancel_vesting(
         &self,
         builder: &mut TransactionBuilder,
         vesting_id: Address,
-        _coin_type: CoinType,
+        coin_type: &str,
     ) -> Result<()> {
         let ms_arg = self.multisig_arg(builder).await?;
-        let vesting_arg = self
-            .shared_val_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
-            .await?;
+        let vesting_argument = self.shared_mut_argument(builder, vesting_id).await?;
 
         let auth = am::multisig::authenticate(builder, ms_arg.borrow());
-        aa::vesting::cancel_payment(builder, auth, vesting_arg, ms_arg.borrow());
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "vesting".parse().unwrap(),
+                "cancel_payment".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![auth.into(), vesting_argument, ms_arg.borrow().into()],
+        );
 
         Ok(())
     }
 
-    pub async fn destroy_empty_vesting<CoinType: MoveType>(
+    pub async fn destroy_empty_vesting(
         &self,
         builder: &mut TransactionBuilder,
         vesting_id: Address,
+        coin_type: &str,
     ) -> Result<()> {
-        let vesting_arg = self
-            .shared_val_arg::<aa::vesting::Vesting<CoinType>>(builder, vesting_id)
-            .await?;
+        let vesting_argument = self.shared_mut_argument(builder, vesting_id).await?;
 
-        aa::vesting::destroy_empty(builder, vesting_arg);
+        builder.move_call(
+            sui_transaction_builder::Function::new(
+                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
+                "vesting".parse().unwrap(),
+                "destroy_empty".parse().unwrap(),
+                vec![coin_type.parse().unwrap()],
+            ),
+            vec![vesting_argument],
+        );
 
         Ok(())
     }
@@ -1686,6 +1729,16 @@ impl MultisigClient {
         Ok(object_arg)
     }
 
+    pub async fn owned_argument(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Argument> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input);
+        Ok(object_arg)
+    }
+
     pub async fn receive_arg<Obj: MoveType + Key>(
         &self,
         builder: &mut TransactionBuilder,
@@ -1703,6 +1756,16 @@ impl MultisigClient {
     ) -> Result<Arg<Obj>> {
         let object_input = self.obj(id).await?;
         let object_arg = builder.input(object_input.by_mut()).into();
+        Ok(object_arg)
+    }
+
+    pub async fn shared_mut_argument(
+        &self,
+        builder: &mut TransactionBuilder,
+        id: Address,
+    ) -> Result<Argument> {
+        let object_input = self.obj(id).await?;
+        let object_arg = builder.input(object_input.by_mut());
         Ok(object_arg)
     }
 
