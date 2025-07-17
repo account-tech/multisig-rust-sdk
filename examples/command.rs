@@ -5,7 +5,7 @@ use sui_graphql_client::{Client, PaginationFilter};
 use sui_sdk_types::{Address, ExecutionStatus};
 use sui_transaction_builder::{unresolved::Input, TransactionBuilder};
 
-use account_multisig_sdk::{define_move_object, MultisigClient};
+use account_multisig_sdk::MultisigClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,17 +18,13 @@ async fn main() -> Result<()> {
         .await?;
     let mut builder = init_tx(client.sui()).await;
 
-    define_move_object!(
-        AdminCap,
-        "0x0e6fe974634e3a96e9ddb10e533255b4556b8e111ecce95c774f65cda919b4a9",
-        "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
-    );
     client
-        .deposit_cap::<AdminCap>(
+        .deposit_cap(
             &mut builder,
             "0x0e6fe974634e3a96e9ddb10e533255b4556b8e111ecce95c774f65cda919b4a9"
                 .parse()
                 .unwrap(),
+            "0xd06dfba27a48b87b5b2add1918f6559ca5b30ef9354fbcc3cb7c492d79193c40::fees::AdminCap",
         )
         .await?;
 
