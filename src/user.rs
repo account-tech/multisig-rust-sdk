@@ -269,6 +269,20 @@ impl User {
         Ok(())
     }
 
+    pub async fn join_multisig(&self, builder: &mut TransactionBuilder, multisig_id: Address) -> Result<()> {
+        let mut user = self.user_arg(builder, *self.id.unwrap().as_address()).await?;
+        let multisig = self.multisig_arg(builder, multisig_id).await?;
+        am::multisig::join(builder, user.borrow_mut(), multisig.borrow());
+        Ok(())
+    }
+
+    pub async fn leave_multisig(&self, builder: &mut TransactionBuilder, multisig_id: Address) -> Result<()> {
+        let mut user = self.user_arg(builder, *self.id.unwrap().as_address()).await?;
+        let multisig = self.multisig_arg(builder, multisig_id).await?;
+        am::multisig::leave(builder, user.borrow_mut(), multisig.borrow());
+        Ok(())
+    }
+
     // === Helpers ===
 
     pub async fn registry_arg(
@@ -289,6 +303,16 @@ impl User {
         let user_input = utils::get_object_as_input(&self.sui_client, user_id).await?;
         let user_arg = builder.input(user_input).into();
         Ok(user_arg)
+    }
+
+    pub async fn multisig_arg(
+        &self,
+        builder: &mut TransactionBuilder,
+        multisig_id: Address,
+    ) -> Result<Arg<ap::account::Account<am::multisig::Multisig>>> {
+        let multisig_input = utils::get_object_as_input(&self.sui_client, multisig_id).await?;
+        let multisig_arg = builder.input(multisig_input.by_ref()).into();
+        Ok(multisig_arg)
     }
 
     pub async fn invite_arg(

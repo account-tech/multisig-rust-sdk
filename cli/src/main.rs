@@ -1,4 +1,6 @@
-use account_multisig_cli::commands::{create::create_multisig, proposal::ProposalCommands};
+use account_multisig_cli::commands::{
+    create::create_multisig, proposal::ProposalCommands, user::UserCommands,
+};
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
@@ -22,8 +24,11 @@ struct App {
 enum Commands {
     #[command(name = "exit", about = "Exit the CLI")]
     Exit,
-    // #[command(name = "user", about = "Manage user")]
-    // UserCommands
+    #[command(name = "user", about = "Manage user")]
+    UserCommands {
+        #[command(subcommand)]
+        command: UserCommands,
+    },
     #[command(name = "load", about = "Load a specific multisig or reload current")]
     Load { id: Option<String> },
     #[command(name = "create", about = "Create a new multisig")]
@@ -43,7 +48,10 @@ enum Commands {
         #[arg(long)]
         role_thresholds: Option<Vec<u64>>,
     },
-    #[command(name = "proposals", about = "Display proposals, pass key to operate on")]
+    #[command(
+        name = "proposals",
+        about = "Display proposals, pass key to operate on"
+    )]
     Proposals {
         /// Proposal key to operate on. If not provided, lists all proposals.
         /// If provided without a subcommand, shows proposal details.
@@ -105,20 +113,32 @@ async fn main() -> Result<()> {
         let mut clap_args = vec!["acc-multisig"];
         clap_args.extend(args);
         match App::try_parse_from(clap_args) {
-            Ok(app) => {
-                match app.command {
-                    Commands::Exit => {
-                        break;
+            Ok(app) => match app.command {
+                Commands::Exit => {
+                    break;
+                }
+                Commands::UserCommands { command } => {
+                    command.run(&mut client, &ed25519_pk).await?;
+                }
+                Commands::Load { id } => {
+                    if let Some(id) = id {
+                        client.load_multisig(id.parse()?).await?;
+                    } else {
+                        client.refresh().await?;
                     }
-                    // Commands::U
-                    Commands::Load { id } => {
-                        if let Some(id) = id {
-                            client.load_multisig(id.parse()?).await?;
-                        } else {
-                            client.refresh().await?;
-                        }
-                    }
-                    Commands::Create {
+                }
+                Commands::Create {
+                    name,
+                    addresses,
+                    weights,
+                    roles,
+                    global_threshold,
+                    role_names,
+                    role_thresholds,
+                } => {
+                    create_multisig(
+                        &client,
+                        &ed25519_pk,
                         name,
                         addresses,
                         weights,
@@ -126,65 +146,53 @@ async fn main() -> Result<()> {
                         global_threshold,
                         role_names,
                         role_thresholds,
-                    } => {
-                        create_multisig(
-                            &client,
-                            &ed25519_pk,
-                            name,
-                            addresses,
-                            weights,
-                            roles,
-                            global_threshold,
-                            role_names,
-                            role_thresholds,
-                        )
-                        .await?;
-                    }
-                    Commands::Proposals {
-                        key,
-                        proposal_command,
-                    } => {
-                        match (key, proposal_command) {
-                            (Some(key), Some(proposal_command)) => {
-                                proposal_command.run(&mut client, &ed25519_pk, key.as_str()).await?;
-                            }
-                            (Some(key), None) => {
-                                let intent = client.intent_mut(key.as_str())?;
-                                println!("\n=== DETAILS ===\n");
-                                println!("Name: {}", intent.key);
-                                println!("Type: {}", intent.type_);
-                                println!("Description: {}", intent.description);
-                                println!("Multisig: {}", intent.account);
-                                println!("Creator: {}", intent.creator);
-                                println!("Creation time: {}", intent.creation_time);
-                                print!("Execution times: ");
-                                for time in &intent.execution_times {
-                                    print!("{} ", time);
-                                }
-                                println!();
-                                println!("Expiration time: {}", intent.expiration_time);
-                                println!("Role: {}", intent.role);
-                                println!("\n=== CURRENT OUTCOME ===\n");
-                                println!("Total weight: {}", intent.outcome.total_weight);
-                                println!("Role weight: {}", intent.outcome.role_weight);
-                                print!("Approved by: ");
-                                for address in &intent.outcome.approved {
-                                    print!("{}", address);
-                                }
-                                let actions = intent.get_actions_args().await?;
-                                println!("\n\n=== ACTIONS ===\n");
-                                println!("{:#?}", actions);
-                            }
-                            (None, None) => {
-                                println!("{}", client.intents().unwrap());
-                            }
-                            _ => {
-                                eprintln!("Invalid command");
-                            }
-                        }
-                    }
+                    )
+                    .await?;
                 }
-            }
+                Commands::Proposals {
+                    key,
+                    proposal_command,
+                } => match (key, proposal_command) {
+                    (Some(key), Some(proposal_command)) => {
+                        proposal_command
+                            .run(&mut client, &ed25519_pk, key.as_str())
+                            .await?;
+                    }
+                    (Some(key), None) => {
+                        let intent = client.intent_mut(key.as_str())?;
+                        println!("\n=== DETAILS ===\n");
+                        println!("Name: {}", intent.key);
+                        println!("Type: {}", intent.type_);
+                        println!("Description: {}", intent.description);
+                        println!("Multisig: {}", intent.account);
+                        println!("Creator: {}", intent.creator);
+                        println!("Creation time: {}", intent.creation_time);
+                        print!("Execution times: ");
+                        for time in &intent.execution_times {
+                            print!("{} ", time);
+                        }
+                        println!();
+                        println!("Expiration time: {}", intent.expiration_time);
+                        println!("Role: {}", intent.role);
+                        println!("\n=== CURRENT OUTCOME ===\n");
+                        println!("Total weight: {}", intent.outcome.total_weight);
+                        println!("Role weight: {}", intent.outcome.role_weight);
+                        print!("Approved by: ");
+                        for address in &intent.outcome.approved {
+                            print!("{}", address);
+                        }
+                        let actions = intent.get_actions_args().await?;
+                        println!("\n\n=== ACTIONS ===\n");
+                        println!("{:#?}", actions);
+                    }
+                    (None, None) => {
+                        println!("{}", client.intents().unwrap());
+                    }
+                    _ => {
+                        eprintln!("Invalid command");
+                    }
+                },
+            },
             Err(e) => {
                 eprintln!("Error: {}", e);
             }
