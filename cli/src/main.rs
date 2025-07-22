@@ -1,5 +1,6 @@
 use account_multisig_cli::commands::{
-    create::create_multisig, proposal::ProposalCommands, user::UserCommands,
+    config::ConfigCommands, create::create_multisig, deps::DepsCommands,
+    proposal::ProposalCommands, user::UserCommands,
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
@@ -59,6 +60,16 @@ enum Commands {
         key: Option<String>,
         #[command(subcommand)]
         proposal_command: Option<ProposalCommands>,
+    },
+    #[command(name = "config", about = "Manage multisig config")]
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+    #[command(name = "deps", about = "Manage dependencies")]
+    Deps {
+        #[command(subcommand)]
+        command: DepsCommands,
     },
 }
 #[tokio::main]
@@ -197,6 +208,12 @@ async fn main() -> Result<()> {
                         eprintln!("Invalid command");
                     }
                 },
+                Commands::Config { command } => {
+                    command.run(&mut client, &ed25519_pk).await?;
+                }
+                Commands::Deps { command } => {
+                    command.run(&mut client, &ed25519_pk).await?;
+                }
             },
             Err(e) => {
                 eprintln!("Error: {}", e);
