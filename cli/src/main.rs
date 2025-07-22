@@ -4,6 +4,7 @@ use account_multisig_cli::commands::{
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
+use colored::*;
 use std::io::{self, Write};
 use sui_config::{SUI_CLIENT_CONFIG, sui_config_dir};
 use sui_crypto::ed25519::Ed25519PrivateKey;
@@ -90,15 +91,19 @@ async fn main() -> Result<()> {
         "mainnet" => MultisigClient::new_mainnet(),
         url => MultisigClient::new_with_url(url)?,
     };
+
+    println!("{}", "Loading user...".yellow().italic());
     client.load_user(active_addr.to_inner().into()).await?;
+
     if let Some(id) = std::env::args().nth(2) {
+        println!("{}", "Loading multisig...".yellow().italic());
         client
             .load_multisig(id.parse().map_err(|_| anyhow!("Invalid multisig id"))?)
             .await?;
     }
 
     loop {
-        print!("multisig> ");
+        print!("{}", "\nmultisig> ".cyan());
         io::stdout().flush()?;
 
         let mut input = String::new();

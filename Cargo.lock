@@ -9,6 +9,7 @@ dependencies = [
  "account-multisig-sdk",
  "anyhow",
  "clap",
+ "colored 3.0.0",
  "serde",
  "serde_json",
  "sui-config",
@@ -1231,7 +1232,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "colored"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
+dependencies = [
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3697,7 +3707,7 @@ source = "git+https://github.com/MystenLabs/sui.git?rev=42ba6c0#42ba6c03128233cd
 dependencies = [
  "anyhow",
  "bcs",
- "colored",
+ "colored 2.2.0",
  "dirs-next",
  "hex",
  "insta",
@@ -3778,7 +3788,7 @@ dependencies = [
  "bcs",
  "clap",
  "codespan",
- "colored",
+ "colored 2.2.0",
  "indexmap 2.10.0",
  "move-abstract-interpreter",
  "move-binary-format",
@@ -5011,7 +5021,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -5630,7 +5640,7 @@ dependencies = [
  "security-framework 3.2.0",
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6164,7 +6174,7 @@ version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1961e2ef424c1424204d3a5d6975f934f56b6d50ff5732382d84ebf460e147f7"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -6253,7 +6263,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6476,7 +6486,7 @@ source = "git+https://github.com/MystenLabs/sui.git?rev=42ba6c0#42ba6c03128233cd
 dependencies = [
  "anyhow",
  "bcs",
- "colored",
+ "colored 2.2.0",
  "enum_dispatch",
  "fastcrypto 0.1.8",
  "itertools 0.13.0",
@@ -6666,7 +6676,7 @@ dependencies = [
  "base64 0.21.7",
  "bcs",
  "clap",
- "colored",
+ "colored 2.2.0",
  "fastcrypto 0.1.8",
  "futures",
  "futures-core",
@@ -7928,7 +7938,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
