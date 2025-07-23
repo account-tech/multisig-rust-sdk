@@ -11,8 +11,6 @@ use crate::tx_utils;
 
 #[derive(Debug, Subcommand)]
 pub enum DepsCommands {
-    #[command(name = "list", about = "List current dependencies")]
-    List,
     #[command(name = "update-to-latest", about = "Update dependencies to latest")]
     UpdateToLatest,
     #[command(
@@ -35,14 +33,6 @@ impl DepsCommands {
     pub async fn run(&self, client: &mut MultisigClient, pk: &Ed25519PrivateKey) -> Result<()> {
         client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
         match self {
-            DepsCommands::List => {
-                let deps = &client.multisig().unwrap().deps;
-                print!("\n\n=== DEPENDENCIES ===\n\n");
-                for dep in deps {
-                    println!("{} - {} - {}", dep.addr, dep.name, dep.version);
-                }
-                Ok(())
-            }
             DepsCommands::UpdateToLatest => {
                 let mut builder =
                     tx_utils::init(client.sui(), pk.public_key().derive_address()).await?;
