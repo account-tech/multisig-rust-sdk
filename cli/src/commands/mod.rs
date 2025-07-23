@@ -6,4 +6,5 @@ pub mod deps;
 pub mod cap;
 pub mod currency;
 pub mod owned;
+pub mod package;
 pub mod vault;

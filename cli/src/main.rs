@@ -1,7 +1,7 @@
 use account_multisig_cli::commands::{
     cap::CapCommands, config::ConfigCommands, create::create_multisig, currency::CurrencyCommands,
-    deps::DepsCommands, owned::OwnedCommands, proposal::ProposalCommands, user::UserCommands,
-    vault::VaultCommands,
+    deps::DepsCommands, owned::OwnedCommands, package::PackageCommands, proposal::ProposalCommands,
+    user::UserCommands, vault::VaultCommands,
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
@@ -72,13 +72,13 @@ enum Commands {
         #[command(subcommand)]
         command: Option<DepsCommands>,
     },
-    #[command(name = "cap", about = "Manage Caps")]
-    Cap {
+    #[command(name = "caps", about = "Manage caps")]
+    Caps {
         #[command(subcommand)]
         command: Option<CapCommands>,
     },
-    #[command(name = "currency", about = "Manage currencies")]
-    Currency {
+    #[command(name = "currencies", about = "Manage currencies")]
+    Currencies {
         #[command(subcommand)]
         command: Option<CurrencyCommands>,
     },
@@ -87,8 +87,13 @@ enum Commands {
         #[command(subcommand)]
         command: Option<OwnedCommands>,
     },
-    #[command(name = "vault", about = "Manage vaults")]
-    Vault {
+    #[command(name = "packages", about = "Manage packages")]
+    Packages {
+        #[command(subcommand)]
+        command: Option<PackageCommands>,
+    },
+    #[command(name = "vaults", about = "Manage vaults")]
+    Vaults {
         #[command(subcommand)]
         command: Option<VaultCommands>,
     },
@@ -274,7 +279,7 @@ async fn main() -> Result<()> {
                         }
                     }
                 },
-                Commands::Cap { command } => match command {
+                Commands::Caps { command } => match command {
                     Some(command) => {
                         command.run(&mut client, &ed25519_pk).await?;
                     }
@@ -286,15 +291,15 @@ async fn main() -> Result<()> {
                         }
                     }
                 },
-                Commands::Currency { command } => match command {
+                Commands::Currencies { command } => match command {
                     Some(command) => {
                         command.run(&mut client, &ed25519_pk).await?;
                     }
                     None => {
                         let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}\n", "=== CURRENCIES ===".bold());
+                        println!("\n{}", "=== CURRENCIES ===".bold());
                         for currency in &multisig.dynamic_fields.as_ref().unwrap().currencies {
-                            println!("{}:", currency.0.underline());
+                            println!("\n{}:", currency.0.underline());
                             println!(
                                 "Max supply: {}",
                                 currency
@@ -345,7 +350,7 @@ async fn main() -> Result<()> {
                     }
                     None => {
                         let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}\n", "=== OWNED OBJECTS ===".bold());
+                        println!("\n{}", "=== OWNED OBJECTS ===".bold());
                         println!("\n{}", "Coins:".underline());
                         let mut coins = multisig.owned_objects.as_ref().unwrap().coins.clone();
                         coins.sort_by(|a, b| a.type_.cmp(&b.type_));
@@ -360,16 +365,32 @@ async fn main() -> Result<()> {
                         }
                     }
                 },
-                Commands::Vault { command } => match command {
+                Commands::Packages { command } => match command {
                     Some(command) => {
                         command.run(&mut client, &ed25519_pk).await?;
                     }
                     None => {
                         let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}\n", "=== VAULTS ===".bold());
+                        println!("\n{}", "=== PACKAGES ===".bold());
+                        for (name, package) in &multisig.dynamic_fields.as_ref().unwrap().packages {
+                            println!("\n{}:", name.underline());
+                            println!("ID: {}", package.package_id);
+                            println!("Policy: {}", package.policy);
+                            println!("TimeLock: {}", package.delay_ms);
+                            println!("Cap: {}", package.cap_id);
+                        }
+                    }
+                },
+                Commands::Vaults { command } => match command {
+                    Some(command) => {
+                        command.run(&mut client, &ed25519_pk).await?;
+                    }
+                    None => {
+                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
+                        println!("\n{}", "=== VAULTS ===".bold());
                         if let Some(dynamic_fields) = multisig.dynamic_fields.as_ref() {
                             for (vault_name, vault) in &dynamic_fields.vaults {
-                                println!("{}:", vault_name.underline());
+                                println!("\n{}:", vault_name.underline());
                                 for (coin_type, amount) in &vault.coins {
                                     println!("{} - {}", coin_type, amount);
                                 }
