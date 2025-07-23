@@ -14,14 +14,14 @@ pub struct OwnedObjects {
     pub objects: Vec<Object>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Coin {
     pub type_: String,
     pub id: Address,
     pub balance: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Object {
     pub type_: String,
     pub id: Address,

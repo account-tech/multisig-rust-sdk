@@ -1,6 +1,7 @@
 use account_multisig_cli::commands::{
     cap::CapCommands, config::ConfigCommands, create::create_multisig, currency::CurrencyCommands,
-    deps::DepsCommands, proposal::ProposalCommands, user::UserCommands, vault::VaultCommands,
+    deps::DepsCommands, owned::OwnedCommands, proposal::ProposalCommands, user::UserCommands,
+    vault::VaultCommands,
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
@@ -27,7 +28,7 @@ enum Commands {
     #[command(name = "exit", about = "Exit the CLI")]
     Exit,
     #[command(name = "user", about = "Manage user")]
-    UserCommands {
+    User {
         #[command(subcommand)]
         command: UserCommands,
     },
@@ -80,6 +81,11 @@ enum Commands {
     Currency {
         #[command(subcommand)]
         command: Option<CurrencyCommands>,
+    },
+    #[command(name = "owned", about = "Manage owned objects")]
+    Owned {
+        #[command(subcommand)]
+        command: Option<OwnedCommands>,
     },
     #[command(name = "vault", about = "Manage vaults")]
     Vault {
@@ -148,7 +154,7 @@ async fn main() -> Result<()> {
                 Commands::Exit => {
                     break;
                 }
-                Commands::UserCommands { command } => {
+                Commands::User { command } => {
                     command.run(&mut client, &ed25519_pk).await?;
                 }
                 Commands::Load { id } => {
@@ -330,6 +336,27 @@ async fn main() -> Result<()> {
                             };
                             println!("Enabled: {}", enabled.join(", "));
                             println!("Disabled: {}", disabled.join(", "));
+                        }
+                    }
+                },
+                Commands::Owned { command } => match command {
+                    Some(command) => {
+                        command.run(&mut client, &ed25519_pk).await?;
+                    }
+                    None => {
+                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
+                        println!("\n{}\n", "=== OWNED OBJECTS ===".bold());
+                        println!("\n{}", "Coins:".underline());
+                        let mut coins = multisig.owned_objects.as_ref().unwrap().coins.clone();
+                        coins.sort_by(|a, b| a.type_.cmp(&b.type_));
+                        for coin in coins {
+                            println!("{} - {} - {}", coin.type_, coin.balance, coin.id);
+                        }
+                        println!("\n{}", "Objects:".underline());
+                        let mut objects = multisig.owned_objects.as_ref().unwrap().objects.clone();
+                        objects.sort_by(|a, b| a.type_.cmp(&b.type_));
+                        for object in objects {
+                            println!("{} - {}", object.type_, object.id);
                         }
                     }
                 },
