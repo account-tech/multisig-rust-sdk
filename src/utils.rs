@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use cynic::QueryBuilder;
 use sui_graphql_client::{
-    query_types::{MoveValue, ObjectFilter, ObjectsQuery, ObjectsQueryArgs, BigInt, schema},
+    query_types::{MoveValue, ObjectFilter, ObjectsQuery, ObjectsQueryArgs},
     Client, Direction, DynamicFieldOutput, PaginationFilter,
 };
-use sui_sdk_types::{Address, Object, Owner};
+use sui_sdk_types::{Address, Object, Owner, framework::Coin};
 use sui_transaction_builder::unresolved::Input;
 
 pub async fn get_object(sui_client: &Client, id: Address) -> Result<Object> {
@@ -60,6 +60,38 @@ pub async fn get_owned_objects(
     }
 
     Ok(objects)
+}
+
+pub async fn get_owned_coins(
+    sui_client: &Client,
+    owner: Address,
+    type_: Option<&str>,
+) -> Result<Vec<Coin<'static>>> {
+    let mut coins = Vec::new();
+    let mut cursor = None;
+    let mut has_next_page = true;
+
+    while has_next_page {
+        let filter = PaginationFilter {
+            direction: Direction::Forward,
+            cursor: cursor.clone(),
+            limit: Some(50),
+        };
+
+        let resp = sui_client
+            .coins(
+                owner,
+                type_,
+                filter
+            )
+            .await?;
+        coins.extend(resp.data().iter().cloned());
+
+        cursor = resp.page_info().end_cursor.clone();
+        has_next_page = resp.page_info().has_next_page;
+    }
+
+    Ok(coins)
 }
 
 pub async fn get_objects(
