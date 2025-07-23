@@ -27,6 +27,14 @@ pub enum DepsCommands {
         #[arg(long, short, help = "Version of the package")]
         versions: Vec<u64>,
     },
+    #[command(
+        name = "propose-toggle-unverified-allowed",
+        about = "Propose to toggle unverified dependencies allowed"
+    )]
+    ProposeToggleUnverifiedAllowed {
+        #[arg(long, short, help = "Name of the proposal")]
+        name: String,
+    },
 }
 
 impl DepsCommands {
@@ -49,13 +57,8 @@ impl DepsCommands {
                 let mut builder =
                     tx_utils::init(client.sui(), pk.public_key().derive_address()).await?;
 
-                let intent_args = ParamsArgs::new(
-                    &mut builder,
-                    name.clone(),
-                    "".to_string(),
-                    vec![],
-                    0,
-                );
+                let intent_args =
+                    ParamsArgs::new(&mut builder, name.clone(), "".to_string(), vec![0], 0);
                 let actions_args = ConfigDepsArgs::new(
                     &mut builder,
                     names.clone(),
@@ -65,6 +68,20 @@ impl DepsCommands {
 
                 client
                     .request_config_deps(&mut builder, intent_args, actions_args)
+                    .await?;
+
+                tx_utils::execute(client.sui(), builder, pk).await?;
+                Ok(())
+            }
+            DepsCommands::ProposeToggleUnverifiedAllowed { name } => {
+                let mut builder =
+                    tx_utils::init(client.sui(), pk.public_key().derive_address()).await?;
+
+                let intent_args =
+                    ParamsArgs::new(&mut builder, name.clone(), "".to_string(), vec![0], 0);
+
+                client
+                    .request_toggle_unverified_allowed(&mut builder, intent_args)
                     .await?;
 
                 tx_utils::execute(client.sui(), builder, pk).await?;

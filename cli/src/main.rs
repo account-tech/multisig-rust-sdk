@@ -1,5 +1,5 @@
 use account_multisig_cli::commands::{
-    cap::CapCommands, config::ConfigCommands, create::create_multisig, deps::DepsCommands, proposal::ProposalCommands, user::UserCommands
+    cap::CapCommands, config::ConfigCommands, create::create_multisig, currency::CurrencyCommands, deps::DepsCommands, proposal::ProposalCommands, user::UserCommands
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
@@ -74,6 +74,11 @@ enum Commands {
     Cap {
         #[command(subcommand)]
         command: Option<CapCommands>,
+    },
+    #[command(name = "currency", about = "Manage currencies")]
+    Currency {
+        #[command(subcommand)]
+        command: Option<CurrencyCommands>,
     },
 }
 #[tokio::main]
@@ -263,6 +268,37 @@ async fn main() -> Result<()> {
                             println!("\n{}\n", "=== CAPS ===".bold());
                             for cap in &multisig.dynamic_fields.as_ref().unwrap().caps {
                                 println!("{}", cap.type_);
+                            }
+                        },
+                    }
+                },
+                Commands::Currency { command } => {
+                    match command {
+                        Some(command) => {
+                            command.run(&mut client, &ed25519_pk).await?;
+                        },
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
+                            println!("\n{}\n", "=== CURRENCIES ===".bold());
+                            for currency in &multisig.dynamic_fields.as_ref().unwrap().currencies {
+                                println!("{}:", currency.0.underline());
+                                println!("Max supply: {}", currency.1.max_supply.map_or("None".to_string(), |max| max.to_string()));
+                                let mut enabled = vec![];
+                                if currency.1.can_mint { enabled.push("mint") };
+                                if currency.1.can_burn { enabled.push("burn") };
+                                if currency.1.can_update_symbol { enabled.push("update_symbol") };
+                                if currency.1.can_update_name { enabled.push("update_name") };
+                                if currency.1.can_update_description { enabled.push("update_description") };
+                                if currency.1.can_update_icon { enabled.push("update_icon") };
+                                let mut disabled = vec![];    
+                                if !currency.1.can_mint { disabled.push("mint") };
+                                if !currency.1.can_burn { disabled.push("burn") };
+                                if !currency.1.can_update_symbol { disabled.push("update_symbol") };
+                                if !currency.1.can_update_name { disabled.push("update_name") };
+                                if !currency.1.can_update_description { disabled.push("update_description") };
+                                if !currency.1.can_update_icon { disabled.push("update_icon") };
+                                println!("Enabled: {}", enabled.join(", "));
+                                println!("Disabled: {}", disabled.join(", "));
                             }
                         },
                     }

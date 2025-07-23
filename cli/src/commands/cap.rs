@@ -29,10 +29,6 @@ pub enum CapCommands {
             help = "Type of the Cap (e.g. <addr>::<module>::<CapType>)"
         )]
         cap_type: String,
-        #[arg(long, help = "Execution times (ms since epoch)")]
-        execution_times: Vec<u64>,
-        #[arg(long, help = "Expiration time (ms since epoch)")]
-        expiration_time: u64,
     },
 }
 
@@ -47,21 +43,11 @@ impl CapCommands {
                 tx_utils::execute(client.sui(), builder, pk).await?;
                 Ok(())
             }
-            CapCommands::ProposeBorrowCap {
-                name,
-                cap_type,
-                execution_times,
-                expiration_time,
-            } => {
+            CapCommands::ProposeBorrowCap { name, cap_type } => {
                 let mut builder =
                     tx_utils::init(client.sui(), pk.public_key().derive_address()).await?;
-                let intent_args = ParamsArgs::new(
-                    &mut builder,
-                    name.clone(),
-                    "".to_string(),
-                    execution_times.clone(),
-                    *expiration_time,
-                );
+                let intent_args =
+                    ParamsArgs::new(&mut builder, name.clone(), "".to_string(), vec![0], 0);
                 client
                     .request_borrow_cap(&mut builder, intent_args, cap_type)
                     .await?;
