@@ -9,14 +9,14 @@ account-multisig-sdk = { path = "../" }
 clap = { version = "4.5", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="d3334e5", features = ["ed25519"] }
+sui-crypto = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-crypto", rev="71bb8c2", features = ["ed25519"] }
 sui-sdk = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
 sui-config = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
 sui-keys = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }
 # workspace dependencies
-sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="d3334e5" }
-sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="d3334e5", features = ["serde"] }
-sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="d3334e5" }
+sui-graphql-client = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-graphql-client", rev="71bb8c2" }
+sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-sdk-types", rev="71bb8c2", features = ["serde"] }
+sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", package = "sui-transaction-builder", rev="71bb8c2" }
 tokio = { version = "1.45", features = ["full"] }
 anyhow = "1.0"
 serde = "1.0"

@@ -939,7 +939,7 @@ impl MultisigClient {
 
         let coin_type = self.actions_generic(intent_key).await?;
 
-        let coin_metadata_object = utils::coin_metadata(self.sui(), coin_type.to_string().as_str())
+        let coin_metadata_object = self.sui().coin_metadata(coin_type.to_string().as_str())
             .await?
             .ok_or(anyhow!("Coin metadata object not found"))?;
         let coin_metadata = self
