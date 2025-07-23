@@ -1,6 +1,5 @@
 use account_multisig_cli::commands::{
-    config::ConfigCommands, create::create_multisig, deps::DepsCommands,
-    proposal::ProposalCommands, user::UserCommands,
+    cap::CapCommands, config::ConfigCommands, create::create_multisig, deps::DepsCommands, proposal::ProposalCommands, user::UserCommands
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
@@ -71,6 +70,11 @@ enum Commands {
         #[command(subcommand)]
         command: Option<DepsCommands>,
     },
+    #[command(name = "cap", about = "Manage Caps")]
+    Cap {
+        #[command(subcommand)]
+        command: Option<CapCommands>,
+    },
 }
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -132,17 +136,17 @@ async fn main() -> Result<()> {
             Ok(app) => match app.command {
                 Commands::Exit => {
                     break;
-                }
+                },
                 Commands::UserCommands { command } => {
                     command.run(&mut client, &ed25519_pk).await?;
-                }
+                },
                 Commands::Load { id } => {
                     if let Some(id) = id {
                         client.load_multisig(id.parse()?).await?;
                     } else {
                         client.refresh().await?;
                     }
-                }
+                },
                 Commands::Create {
                     name,
                     addresses,
@@ -164,7 +168,7 @@ async fn main() -> Result<()> {
                         role_thresholds,
                     )
                     .await?;
-                }
+                },
                 Commands::Proposals {
                     key,
                     proposal_command,
@@ -173,7 +177,7 @@ async fn main() -> Result<()> {
                         proposal_command
                             .run(&mut client, &ed25519_pk, key.as_str())
                             .await?;
-                    }
+                    },
                     (Some(key), None) => {
                         let intent = client.intent_mut(key.as_str())?;
                         println!("\n{}", "=== PROPOSAL ===".bold());
@@ -201,23 +205,23 @@ async fn main() -> Result<()> {
                         let actions = intent.get_actions_args().await?;
                         println!("\n\n{}", "Actions:".underline());
                         println!("{:#?}", actions);
-                    }
+                    },
                     (None, None) => {
                         println!("\n{}\n", "=== PROPOSALS ===".bold());
                         let intents = client.intents().ok_or(anyhow!("Intents not loaded"))?;
                         for (key, intent) in &intents.intents {
                             println!("{} - {}", key, intent.type_);
                         }
-                    }
+                    },
                     _ => {
                         eprintln!("Invalid command");
-                    }
+                    },
                 },
                 Commands::Config { command } => {
                     match command {
                         Some(command) => {
                             command.run(&mut client, &ed25519_pk).await?;
-                        }
+                        },
                         None => {
                             let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
                             println!("\n{}", "=== MULTISIG CONFIG ===".bold());
@@ -232,21 +236,35 @@ async fn main() -> Result<()> {
                             for (name, role) in &multisig.config.roles {
                                 println!("{}: {}", name, role.threshold);
                             }
-                        }
+                        },
                     }
-                }
+                },
                 Commands::Deps { command } => {
                     match command {
                         Some(command) => {
                             command.run(&mut client, &ed25519_pk).await?;
-                        }
+                        },
                         None => {
                             let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
                             println!("\n{}\n", "=== DEPENDENCIES ===".bold());
                             for dep in &multisig.deps {
-                                println!("{} - {} - {}", dep.addr, dep.name, dep.version);
+                                println!("{} - V{} - {}", dep.addr, dep.version, dep.name);
                             }
-                        }
+                        },
+                    }
+                },
+                Commands::Cap { command } => {
+                    match command {
+                        Some(command) => {
+                            command.run(&mut client, &ed25519_pk).await?;
+                        },
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
+                            println!("\n{}\n", "=== CAPS ===".bold());
+                            for cap in &multisig.dynamic_fields.as_ref().unwrap().caps {
+                                println!("{}", cap.type_);
+                            }
+                        },
                     }
                 }
             },
