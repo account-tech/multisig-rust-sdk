@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use colored::*;
 use sui_crypto::{SuiSigner, ed25519::Ed25519PrivateKey};
 use sui_graphql_client::{Client, PaginationFilter};
 use sui_sdk_types::{Address, ExecutionStatus};
@@ -51,6 +52,6 @@ pub async fn execute(
     println!("Effects: {:#?}", &effects);
     assert_eq!(&ExecutionStatus::Success, effects?.unwrap().status());
 
-    println!("Transaction executed successfully");
+    println!("\n{}", "Transaction executed successfully".green());
     Ok(())
 }

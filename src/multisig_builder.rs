@@ -15,7 +15,7 @@ pub struct MultisigBuilder<'a> {
     pub config: Option<Config>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Config {
     pub addresses: Vec<String>,
     pub weights: Vec<u64>,
@@ -23,6 +23,20 @@ pub struct Config {
     pub global_threshold: u64,
     pub role_names: Vec<String>,
     pub role_thresholds: Vec<u64>,
+}
+
+impl Config {
+    pub fn from_state(client: &MultisigClient) -> Result<Self> {
+        let config = &client.multisig().ok_or(anyhow!("Multisig not loaded"))?.config;
+        Ok(Self {
+            addresses: config.members.iter().map(|m| m.address.to_string()).collect(),
+            weights: config.members.iter().map(|m| m.weight).collect(),
+            roles: config.members.iter().map(|m| m.roles.iter().map(|r| r.to_string()).collect()).collect(),
+            global_threshold: config.global.threshold,
+            role_names: config.roles.iter().map(|(name, _)| name.to_string()).collect(),
+            role_thresholds: config.roles.iter().map(|(_, role)| role.threshold).collect(),
+        })
+    }
 }
 
 impl<'a> MultisigBuilder<'a> {
@@ -42,7 +56,7 @@ impl<'a> MultisigBuilder<'a> {
 
     pub fn set_global_threshold(mut self, threshold: u64) -> Self {
         if self.config.is_none() {
-            self.config = Some(Config::default());
+            self.config = Some(Config::from_state(self.client).unwrap());
         }
         self.config.as_mut().unwrap().global_threshold = threshold;
         self
@@ -50,7 +64,11 @@ impl<'a> MultisigBuilder<'a> {
 
     pub fn add_member(mut self, address: &str, weight: u64, roles: Vec<&str>) -> Self {
         if self.config.is_none() {
-            self.config = Some(Config::default());
+            self.config = Some(Config::from_state(self.client).unwrap());
+            // clear addresses, weights, and roles to add new ones
+            self.config.as_mut().unwrap().addresses = vec![];
+            self.config.as_mut().unwrap().weights = vec![];
+            self.config.as_mut().unwrap().roles = vec![];
         }
 
         self.config
@@ -70,8 +88,12 @@ impl<'a> MultisigBuilder<'a> {
 
     pub fn add_role(mut self, role: &str, threshold: u64) -> Self {
         if self.config.is_none() {
-            self.config = Some(Config::default());
+            self.config = Some(Config::from_state(self.client).unwrap());
+            // clear role names and thresholds to add new ones
+            self.config.as_mut().unwrap().role_names = vec![];
+            self.config.as_mut().unwrap().role_thresholds = vec![];
         }
+
         self.config
             .as_mut()
             .unwrap()

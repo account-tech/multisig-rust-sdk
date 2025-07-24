@@ -39,7 +39,7 @@ impl UserCommands {
 
         match self {
             UserCommands::ListMultisigs => {
-                print!("\n\n=== MULTISIGS ===\n\n");
+                println!("\n=== MULTISIGS ===\n");
                 for multisig in &user.multisigs {
                     println!("{} - {}", multisig.id, multisig.name);
                 }
@@ -62,7 +62,7 @@ impl UserCommands {
                 Ok(())
             },
             UserCommands::ListInvites => {
-                print!("\n\n=== INVITES ===\n");
+                println!("\n=== INVITES ===");
                 for invite in &user.invites {
                     println!("\nInvite: {}", invite.id);
                     println!("Multisig: {} - {}", invite.multisig_id, invite.multisig_name);

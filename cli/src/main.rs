@@ -1,13 +1,21 @@
 use account_multisig_cli::commands::{
-    cap::CapCommands, config::ConfigCommands, create::create_multisig, currency::CurrencyCommands,
-    deps::DepsCommands, owned::OwnedCommands, package::PackageCommands, proposal::ProposalCommands,
-    user::UserCommands, vault::VaultCommands,
+    cap::CapCommands,
+    config::ConfigCommands,
+    create::{Member, Role, create_multisig},
+    currency::CurrencyCommands,
+    deps::DepsCommands,
+    owned::OwnedCommands,
+    package::PackageCommands,
+    proposal::ProposalCommands,
+    user::UserCommands,
+    vault::VaultCommands,
 };
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
 use std::io::{self, Write};
+use std::str::FromStr;
 use sui_config::{SUI_CLIENT_CONFIG, sui_config_dir};
 use sui_crypto::ed25519::Ed25519PrivateKey;
 use sui_keys::keystore::AccountKeystore;
@@ -39,17 +47,11 @@ enum Commands {
         #[arg(long)]
         name: Option<String>,
         #[arg(long)]
-        addresses: Option<Vec<String>>,
-        #[arg(long)]
-        weights: Option<Vec<u64>>,
-        #[arg(long)]
-        roles: Option<Vec<String>>,
-        #[arg(long)]
         global_threshold: Option<u64>,
-        #[arg(long)]
-        role_names: Option<Vec<String>>,
-        #[arg(long)]
-        role_thresholds: Option<Vec<u64>>,
+        #[arg(long, value_parser = clap::builder::ValueParser::new(Member::from_str))]
+        member: Option<Vec<Member>>,
+        #[arg(long, value_parser = clap::builder::ValueParser::new(Role::from_str))]
+        role: Option<Vec<Role>>,
     },
     #[command(
         name = "proposals",
@@ -98,6 +100,7 @@ enum Commands {
         command: Option<VaultCommands>,
     },
 }
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::fmt()
@@ -152,7 +155,7 @@ async fn main() -> Result<()> {
         }
 
         let args: Vec<&str> = input.split_whitespace().collect();
-        let mut clap_args = vec!["acc-multisig"];
+        let mut clap_args = vec!["interactive"];
         clap_args.extend(args);
         match App::try_parse_from(clap_args) {
             Ok(app) => match app.command {
@@ -171,25 +174,12 @@ async fn main() -> Result<()> {
                 }
                 Commands::Create {
                     name,
-                    addresses,
-                    weights,
-                    roles,
                     global_threshold,
-                    role_names,
-                    role_thresholds,
+                    member,
+                    role,
                 } => {
-                    create_multisig(
-                        &client,
-                        &ed25519_pk,
-                        name,
-                        addresses,
-                        weights,
-                        roles,
-                        global_threshold,
-                        role_names,
-                        role_thresholds,
-                    )
-                    .await?;
+                    create_multisig(&client, &ed25519_pk, name, global_threshold, member, role)
+                        .await?;
                 }
                 Commands::Proposals {
                     key,
