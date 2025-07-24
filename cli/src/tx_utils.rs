@@ -41,17 +41,24 @@ pub async fn execute(
     let tx = builder.finish()?;
     let sig = pk.sign_transaction(&tx)?;
 
+    println!("{}", "Executing transaction...".yellow().italic());
     let effects = sui_client.execute_tx(vec![sig], &tx).await;
-    // check that it succeeded
-    assert!(effects.is_ok(), "Execution failed. Effects: {:?}", effects);
     // wait for the transaction to be finalized
     while sui_client.transaction(tx.digest()).await?.is_none() {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     // display effects
     println!("Effects: {:#?}", &effects);
-    assert_eq!(&ExecutionStatus::Success, effects?.unwrap().status());
+    let status = effects.as_ref().unwrap().as_ref().unwrap().status();
+    if status == &ExecutionStatus::Success {
+        println!("\n{}", "Transaction executed successfully".green());
+    } else {
+        println!("\n{}", "Transaction failed".red());
+        if let ExecutionStatus::Failure { error, command } = status.clone() {
+            println!("Error: {:?}", error);
+            println!("Command: {:?}", command);
+        }
+    }
 
-    println!("\n{}", "Transaction executed successfully".green());
     Ok(())
 }
