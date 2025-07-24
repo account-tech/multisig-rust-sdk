@@ -159,239 +159,295 @@ async fn main() -> Result<()> {
         let mut clap_args = vec!["interactive"];
         clap_args.extend(args);
         match App::try_parse_from(clap_args) {
-            Ok(app) => match app.command {
-                Commands::Exit => {
-                    break;
-                }
-                Commands::User { command } => {
-                    command.run(&mut client, &ed25519_pk).await?;
-                }
-                Commands::Load { id } => {
-                    if let Some(id) = id {
-                        client.load_multisig(id.parse()?).await?;
-                    } else {
-                        client.refresh().await?;
+            Ok(app) => {
+                // Wrap command execution in error handling
+                let result = match app.command {
+                    Commands::Exit => {
+                        break;
                     }
-                }
-                Commands::Create {
-                    name,
-                    global_threshold,
-                    member,
-                    role,
-                } => {
-                    create_multisig(&client, &ed25519_pk, name, global_threshold, member, role)
-                        .await?;
-                }
-                Commands::Proposals {
-                    key,
-                    proposal_command,
-                } => match (key, proposal_command) {
-                    (Some(key), Some(proposal_command)) => {
-                        proposal_command
-                            .run(&mut client, &ed25519_pk, key.as_str())
-                            .await?;
-                    }
-                    (Some(key), None) => {
-                        let intent = client.intent_mut(key.as_str())?;
-                        println!("\n{}", "=== PROPOSAL ===".bold());
-                        println!("\n{}", "Details:".underline());
-                        println!("Name: {}", intent.key);
-                        println!("Type: {}", intent.type_);
-                        println!("Description: {}", intent.description);
-                        println!("Multisig: {}", intent.account);
-                        println!("Creator: {}", intent.creator);
-                        println!("Creation time: {}", intent.creation_time);
-                        print!("Execution times: ");
-                        for time in &intent.execution_times {
-                            print!("{} ", time);
-                        }
-                        println!();
-                        println!("Expiration time: {}", intent.expiration_time);
-                        println!("Role: {}", intent.role);
-                        println!("\n{}", "Current outcome:".underline());
-                        println!("Total weight: {}", intent.outcome.total_weight);
-                        println!("Role weight: {}", intent.outcome.role_weight);
-                        print!("Approved by: ");
-                        for address in &intent.outcome.approved {
-                            print!("{}", address);
-                        }
-                        let actions = intent.get_actions_args().await?;
-                        println!("\n\n{}", "Actions:".underline());
-                        println!("{:#?}", actions);
-                    }
-                    (None, None) => {
-                        println!("\n{}\n", "=== PROPOSALS ===".bold());
-                        let intents = client.intents().ok_or(anyhow!("Intents not loaded"))?;
-                        for (key, intent) in &intents.intents {
-                            println!("{} - {}", key, intent.type_);
+                    Commands::User { command } => command.run(&mut client, &ed25519_pk).await,
+                    Commands::Load { id } => {
+                        if let Some(id) = id {
+                            client.load_multisig(id.parse()?).await
+                        } else {
+                            client.refresh().await
                         }
                     }
-                    _ => {
-                        eprintln!("Invalid command");
+                    Commands::Create {
+                        name,
+                        global_threshold,
+                        member,
+                        role,
+                    } => {
+                        create_multisig(&client, &ed25519_pk, name, global_threshold, member, role)
+                            .await
                     }
-                },
-                Commands::Config { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}", "=== MULTISIG CONFIG ===".bold());
-                        println!("\n{} ", "Name:".underline());
-                        println!(
-                            "{}",
-                            multisig.metadata.get("name").unwrap_or(&"".to_string())
-                        );
-                        println!("\n{}", "Members:".underline());
-                        for member in &multisig.config.members {
-                            println!(
-                                "{} - {} - [{}]",
-                                member.address,
-                                member.weight,
-                                member.roles.join(", ")
-                            );
+                    Commands::Proposals {
+                        key,
+                        proposal_command,
+                    } => match (key, proposal_command) {
+                        (Some(key), Some(proposal_command)) => {
+                            proposal_command
+                                .run(&mut client, &ed25519_pk, key.as_str())
+                                .await
                         }
-                        println!("\n{}", "Thresholds:".underline());
-                        println!("Global: {}", multisig.config.global.threshold);
-                        for (name, role) in &multisig.config.roles {
-                            println!("{}: {}", name, role.threshold);
-                        }
-                    }
-                },
-                Commands::Deps { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}\n", "=== DEPENDENCIES ===".bold());
-                        for dep in &multisig.deps {
-                            println!("{} - V{} - {}", dep.addr, dep.version, dep.name);
-                        }
-                    }
-                },
-                Commands::Caps { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}\n", "=== CAPS ===".bold());
-                        for cap in &multisig.dynamic_fields.as_ref().unwrap().caps {
-                            println!("{}", cap.type_);
-                        }
-                    }
-                },
-                Commands::Currencies { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}", "=== CURRENCIES ===".bold());
-                        for currency in &multisig.dynamic_fields.as_ref().unwrap().currencies {
-                            println!("\n{}:", currency.0.underline());
-                            println!(
-                                "Max supply: {}",
-                                currency
-                                    .1
-                                    .max_supply
-                                    .map_or("None".to_string(), |max| max.to_string())
-                            );
-                            let mut enabled = vec![];
-                            let mut disabled = vec![];
-                            if currency.1.can_mint {
-                                enabled.push("mint")
-                            } else {
-                                disabled.push("mint")
-                            };
-                            if currency.1.can_burn {
-                                enabled.push("burn")
-                            } else {
-                                disabled.push("burn")
-                            };
-                            if currency.1.can_update_symbol {
-                                enabled.push("update_symbol")
-                            } else {
-                                disabled.push("update_symbol")
-                            };
-                            if currency.1.can_update_name {
-                                enabled.push("update_name")
-                            } else {
-                                disabled.push("update_name")
-                            };
-                            if currency.1.can_update_description {
-                                enabled.push("update_description")
-                            } else {
-                                disabled.push("update_description")
-                            };
-                            if currency.1.can_update_icon {
-                                enabled.push("update_icon")
-                            } else {
-                                disabled.push("update_icon")
-                            };
-                            println!("Enabled: {}", enabled.join(", "));
-                            println!("Disabled: {}", disabled.join(", "));
-                        }
-                    }
-                },
-                Commands::Owned { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}", "=== OWNED OBJECTS ===".bold());
-                        println!("\n{}", "Coins:".underline());
-                        let mut coins = multisig.owned_objects.as_ref().unwrap().coins.clone();
-                        coins.sort_by(|a, b| a.type_.cmp(&b.type_));
-                        for coin in coins {
-                            println!("{} - {} - {}", coin.type_, coin.balance, coin.id);
-                        }
-                        println!("\n{}", "Objects:".underline());
-                        let mut objects = multisig.owned_objects.as_ref().unwrap().objects.clone();
-                        objects.sort_by(|a, b| a.type_.cmp(&b.type_));
-                        for object in objects {
-                            println!("{} - {}", object.type_, object.id);
-                        }
-                    }
-                },
-                Commands::Packages { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}", "=== PACKAGES ===".bold());
-                        for (name, package) in &multisig.dynamic_fields.as_ref().unwrap().packages {
-                            println!("\n{}:", name.underline());
-                            println!("ID: {}", package.package_id);
-                            println!("Policy: {}", package.policy);
-                            println!("TimeLock: {}", package.delay_ms);
-                            println!("Cap: {}", package.cap_id);
-                        }
-                    }
-                },
-                Commands::Vaults { command } => match command {
-                    Some(command) => {
-                        command.run(&mut client, &ed25519_pk).await?;
-                    }
-                    None => {
-                        let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"))?;
-                        println!("\n{}", "=== VAULTS ===".bold());
-                        if let Some(dynamic_fields) = multisig.dynamic_fields.as_ref() {
-                            for (vault_name, vault) in &dynamic_fields.vaults {
-                                println!("\n{}:", vault_name.underline());
-                                for (coin_type, amount) in &vault.coins {
-                                    println!("{} - {}", coin_type, amount);
+                        (Some(key), None) => {
+                            let intent = client.intent_mut(key.as_str());
+                            match intent {
+                                Ok(intent) => {
+                                    println!("\n{}", "=== PROPOSAL ===".bold());
+                                    println!("\n{}", "Details:".underline());
+                                    println!("Name: {}", intent.key);
+                                    println!("Type: {}", intent.type_);
+                                    println!("Description: {}", intent.description);
+                                    println!("Multisig: {}", intent.account);
+                                    println!("Creator: {}", intent.creator);
+                                    println!("Creation time: {}", intent.creation_time);
+                                    print!("Execution times: ");
+                                    for time in &intent.execution_times {
+                                        print!("{} ", time);
+                                    }
+                                    println!();
+                                    println!("Expiration time: {}", intent.expiration_time);
+                                    println!("Role: {}", intent.role);
+                                    println!("\n{}", "Current outcome:".underline());
+                                    println!("Total weight: {}", intent.outcome.total_weight);
+                                    println!("Role weight: {}", intent.outcome.role_weight);
+                                    print!("Approved by: ");
+                                    for address in &intent.outcome.approved {
+                                        print!("{}", address);
+                                    }
+                                    let actions = intent.get_actions_args().await;
+                                    match actions {
+                                        Ok(actions) => {
+                                            println!("\n\n{}", "Actions:".underline());
+                                            println!("{:#?}", actions);
+                                            Ok(())
+                                        }
+                                        Err(e) => Err(e),
+                                    }
                                 }
+                                Err(e) => Err(e),
                             }
                         }
-                    }
-                },
-            },
+                        (None, None) => {
+                            let intents = client.intents().ok_or(anyhow!("Intents not loaded"));
+                            match intents {
+                                Ok(intents) => {
+                                    println!("\n{}\n", "=== PROPOSALS ===".bold());
+                                    for (key, intent) in &intents.intents {
+                                        println!("{} - {}", key, intent.type_);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                        _ => {
+                            eprintln!("Invalid command");
+                            Ok(())
+                        }
+                    },
+                    Commands::Config { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}", "=== MULTISIG CONFIG ===".bold());
+                                    println!("\n{} ", "Name:".underline());
+                                    println!(
+                                        "{}",
+                                        multisig.metadata.get("name").unwrap_or(&"".to_string())
+                                    );
+                                    println!("\n{}", "Members:".underline());
+                                    for member in &multisig.config.members {
+                                        println!(
+                                            "{} - {} - [{}]",
+                                            member.address,
+                                            member.weight,
+                                            member.roles.join(", ")
+                                        );
+                                    }
+                                    println!("\n{}", "Thresholds:".underline());
+                                    println!("Global: {}", multisig.config.global.threshold);
+                                    for (name, role) in &multisig.config.roles {
+                                        println!("{}: {}", name, role.threshold);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Deps { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}\n", "=== DEPENDENCIES ===".bold());
+                                    for dep in &multisig.deps {
+                                        println!("{} - V{} - {}", dep.addr, dep.version, dep.name);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Caps { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}\n", "=== CAPS ===".bold());
+                                    for cap in &multisig.dynamic_fields.as_ref().unwrap().caps {
+                                        println!("{}", cap.type_);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Currencies { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}", "=== CURRENCIES ===".bold());
+                                    for currency in
+                                        &multisig.dynamic_fields.as_ref().unwrap().currencies
+                                    {
+                                        println!("\n{}:", currency.0.underline());
+                                        println!(
+                                            "Max supply: {}",
+                                            currency
+                                                .1
+                                                .max_supply
+                                                .map_or("None".to_string(), |max| max.to_string())
+                                        );
+                                        let mut enabled = vec![];
+                                        let mut disabled = vec![];
+                                        if currency.1.can_mint {
+                                            enabled.push("mint")
+                                        } else {
+                                            disabled.push("mint")
+                                        };
+                                        if currency.1.can_burn {
+                                            enabled.push("burn")
+                                        } else {
+                                            disabled.push("burn")
+                                        };
+                                        if currency.1.can_update_symbol {
+                                            enabled.push("update_symbol")
+                                        } else {
+                                            disabled.push("update_symbol")
+                                        };
+                                        if currency.1.can_update_name {
+                                            enabled.push("update_name")
+                                        } else {
+                                            disabled.push("update_name")
+                                        };
+                                        if currency.1.can_update_description {
+                                            enabled.push("update_description")
+                                        } else {
+                                            disabled.push("update_description")
+                                        };
+                                        if currency.1.can_update_icon {
+                                            enabled.push("update_icon")
+                                        } else {
+                                            disabled.push("update_icon")
+                                        };
+                                        println!("Enabled: {}", enabled.join(", "));
+                                        println!("Disabled: {}", disabled.join(", "));
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Owned { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}", "=== OWNED OBJECTS ===".bold());
+                                    println!("\n{}", "Coins:".underline());
+                                    let mut coins =
+                                        multisig.owned_objects.as_ref().unwrap().coins.clone();
+                                    coins.sort_by(|a, b| a.type_.cmp(&b.type_));
+                                    for coin in coins {
+                                        println!("{} - {} - {}", coin.type_, coin.balance, coin.id);
+                                    }
+                                    println!("\n{}", "Objects:".underline());
+                                    let mut objects =
+                                        multisig.owned_objects.as_ref().unwrap().objects.clone();
+                                    objects.sort_by(|a, b| a.type_.cmp(&b.type_));
+                                    for object in objects {
+                                        println!("{} - {}", object.type_, object.id);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Packages { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}", "=== PACKAGES ===".bold());
+                                    for (name, package) in
+                                        &multisig.dynamic_fields.as_ref().unwrap().packages
+                                    {
+                                        println!("\n{}:", name.underline());
+                                        println!("ID: {}", package.package_id);
+                                        println!("Policy: {}", package.policy);
+                                        println!("TimeLock: {}", package.delay_ms);
+                                        println!("Cap: {}", package.cap_id);
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                    Commands::Vaults { command } => match command {
+                        Some(command) => command.run(&mut client, &ed25519_pk).await,
+                        None => {
+                            let multisig = client.multisig().ok_or(anyhow!("Multisig not loaded"));
+                            match multisig {
+                                Ok(multisig) => {
+                                    println!("\n{}", "=== VAULTS ===".bold());
+                                    if let Some(dynamic_fields) = multisig.dynamic_fields.as_ref() {
+                                        for (vault_name, vault) in &dynamic_fields.vaults {
+                                            println!("\n{}:", vault_name.underline());
+                                            for (coin_type, amount) in &vault.coins {
+                                                println!("{} - {}", coin_type, amount);
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    },
+                };
+                if let Err(e) = result {
+                    eprintln!("Error: {e}");
+                }
+            }
             Err(e) => {
-                eprintln!("Error: {}", e);
+                eprintln!("Parse error: {e}");
             }
         }
     }
