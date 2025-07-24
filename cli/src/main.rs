@@ -145,6 +145,7 @@ async fn main() -> Result<()> {
     loop {
         print!("{}", "\nmultisig> ".cyan());
         io::stdout().flush()?;
+        client.refresh().await?; // update the state between commands/txs
 
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
