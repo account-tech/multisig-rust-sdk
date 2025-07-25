@@ -48,7 +48,7 @@ impl UserCommands {
             UserCommands::JoinMultisig { multisig_id } => {
                 let addr = pk.public_key().derive_address();
                 let mut builder = tx_utils::init(client.sui(), addr).await?;
-                user.join_multisig(&mut builder, multisig_id.parse().unwrap())
+                user.join_multisig(&mut builder, multisig_id.parse()?)
                     .await?;
                 tx_utils::execute(client.sui(), builder, pk).await?;
                 Ok(())
@@ -56,7 +56,7 @@ impl UserCommands {
             UserCommands::LeaveMultisig { multisig_id } => {
                 let addr = pk.public_key().derive_address();
                 let mut builder = tx_utils::init(client.sui(), addr).await?;
-                user.leave_multisig(&mut builder, multisig_id.parse().unwrap())
+                user.leave_multisig(&mut builder, multisig_id.parse()?)
                     .await?;
                 tx_utils::execute(client.sui(), builder, pk).await?;
                 Ok(())
@@ -72,7 +72,7 @@ impl UserCommands {
             UserCommands::AcceptInvite { invite_id } => {
                 let addr = pk.public_key().derive_address();
                 let mut builder = tx_utils::init(client.sui(), addr).await?;
-                user.accept_invite(&mut builder, invite_id.parse().unwrap())
+                user.accept_invite(&mut builder, invite_id.parse()?)
                     .await?;
                 tx_utils::execute(client.sui(), builder, pk).await?;
                 Ok(())
@@ -80,7 +80,7 @@ impl UserCommands {
             UserCommands::RefuseInvite { invite_id } => {
                 let addr = pk.public_key().derive_address();
                 let mut builder = tx_utils::init(client.sui(), addr).await?;
-                user.refuse_invite(&mut builder, invite_id.parse().unwrap())
+                user.refuse_invite(&mut builder, invite_id.parse()?)
                     .await?;
                 tx_utils::execute(client.sui(), builder, pk).await?;
                 Ok(())

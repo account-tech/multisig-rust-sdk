@@ -290,7 +290,7 @@ impl User {
         builder: &mut TransactionBuilder,
     ) -> Result<Arg<ap::user::Registry>> {
         let registry_input =
-            utils::get_object_as_input(&self.sui_client, Self::REGISTRY.parse().unwrap()).await?;
+            utils::get_object_as_input(&self.sui_client, Self::REGISTRY.parse()?).await?;
         let registry_arg = builder.input(registry_input.by_mut()).into();
         Ok(registry_arg)
     }

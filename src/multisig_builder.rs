@@ -244,7 +244,7 @@ impl<'a> MultisigBuilder<'a> {
                     client
                         .user()
                         .unwrap()
-                        .send_invite(builder, &multisig, addr.parse().unwrap())
+                        .send_invite(builder, &multisig, addr.parse()?)
                         .await?;
                 }
             }

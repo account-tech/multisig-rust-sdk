@@ -99,7 +99,7 @@ impl MultisigClient {
         let coin_arg = builder.split_coins(builder.gas(), vec![coin_amount]);
         let fee_arg = builder.input(Input::from(&fee_obj).by_ref());
         let extensions =
-            builder.input(self.obj(EXTENSIONS_OBJECT.parse().unwrap()).await?.by_ref());
+            builder.input(self.obj(EXTENSIONS_OBJECT.parse()?).await?.by_ref());
 
         let account_obj =
             am::multisig::new_account(builder, extensions.into(), fee_arg.into(), coin_arg.into());
@@ -216,10 +216,10 @@ impl MultisigClient {
         let auth = am::multisig::authenticate(builder, multisig.borrow());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control".parse().unwrap(),
-                "lock_cap".parse().unwrap(),
-                vec![cap_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control".parse()?,
+                "lock_cap".parse()?,
+                vec![cap_type.parse()?],
             ),
             vec![auth.into(), multisig.borrow_mut().into(), cap],
         );
@@ -241,10 +241,10 @@ impl MultisigClient {
         let auth = am::multisig::authenticate(builder, multisig.borrow());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency".parse().unwrap(),
-                "lock_cap".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency".parse()?,
+                "lock_cap".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -276,10 +276,10 @@ impl MultisigClient {
         let auth = am::multisig::authenticate(builder, multisig.borrow());
         let ids = builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_PROTOCOL_PACKAGE.parse().unwrap(),
-                "owned".parse().unwrap(),
-                "merge_and_split".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_PROTOCOL_PACKAGE.parse()?,
+                "owned".parse()?,
+                "merge_and_split".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -346,10 +346,10 @@ impl MultisigClient {
         let auth = am::multisig::authenticate(builder, multisig.borrow());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault".parse().unwrap(),
-                "deposit".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault".parse()?,
+                "deposit".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![auth.into(), multisig.borrow_mut().into(), vault_name, coin],
         );
@@ -386,10 +386,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vesting".parse().unwrap(),
-                "claim".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vesting".parse()?,
+                "claim".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![vesting, cap.borrow().into(), clock.borrow().into()],
         );
@@ -409,10 +409,10 @@ impl MultisigClient {
         let auth = am::multisig::authenticate(builder, multisig.borrow());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vesting".parse().unwrap(),
-                "cancel_payment".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vesting".parse()?,
+                "cancel_payment".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![auth.into(), vesting, multisig.borrow().into()],
         );
@@ -430,10 +430,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vesting".parse().unwrap(),
-                "destroy_empty".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vesting".parse()?,
+                "destroy_empty".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![vesting],
         );
@@ -663,10 +663,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control_intents".parse().unwrap(),
-                "request_borrow_cap".parse().unwrap(),
-                vec![cap_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control_intents".parse()?,
+                "request_borrow_cap".parse()?,
+                vec![cap_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -694,9 +694,9 @@ impl MultisigClient {
         let cap_type = self.actions_generic(intent_key).await?;
         let cap = builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control_intents".parse().unwrap(),
-                "execute_borrow_cap".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control_intents".parse()?,
+                "execute_borrow_cap".parse()?,
                 vec![cap_type],
             ),
             vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -718,9 +718,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control_intents".parse().unwrap(),
-                "execute_return_cap".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control_intents".parse()?,
+                "execute_return_cap".parse()?,
                 vec![cap_type.clone()],
             ),
             vec![
@@ -740,18 +740,18 @@ impl MultisigClient {
 
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "access_control".parse().unwrap(),
-                    "delete_borrow".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "access_control".parse()?,
+                    "delete_borrow".parse()?,
                     vec![cap_type.clone()],
                 ),
                 vec![expired.borrow_mut().into()],
             );
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "access_control".parse().unwrap(),
-                    "delete_return".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "access_control".parse()?,
+                    "delete_return".parse()?,
                     vec![cap_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -775,18 +775,18 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control".parse().unwrap(),
-                "delete_borrow".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control".parse()?,
+                "delete_borrow".parse()?,
                 vec![cap_type.clone()],
             ),
             vec![expired.borrow_mut().into()],
         );
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "access_control".parse().unwrap(),
-                "delete_return".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "access_control".parse()?,
+                "delete_return".parse()?,
                 vec![cap_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -808,10 +808,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_disable_rules".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_disable_rules".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -842,9 +842,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "execute_disable_rules".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "execute_disable_rules".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -860,9 +860,9 @@ impl MultisigClient {
 
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency".parse().unwrap(),
-                    "delete_disable".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency".parse()?,
+                    "delete_disable".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -885,9 +885,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency".parse().unwrap(),
-                "delete_disable".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency".parse()?,
+                "delete_disable".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -909,10 +909,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_update_metadata".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_update_metadata".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -948,9 +948,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "execute_update_metadata".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "execute_update_metadata".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![
@@ -970,9 +970,9 @@ impl MultisigClient {
 
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency".parse().unwrap(),
-                    "delete_update".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency".parse()?,
+                    "delete_update".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -995,9 +995,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency".parse().unwrap(),
-                "delete_update".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency".parse()?,
+                "delete_update".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -1019,10 +1019,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_mint_and_transfer".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_mint_and_transfer".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1050,9 +1050,9 @@ impl MultisigClient {
         for _ in 0..executions_count {
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency_intents".parse().unwrap(),
-                    "execute_mint_and_transfer".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency_intents".parse()?,
+                    "execute_mint_and_transfer".parse()?,
                     vec![coin_type.clone()],
                 ),
                 vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -1070,9 +1070,9 @@ impl MultisigClient {
             for _ in 0..executions_count {
                 builder.move_call(
                     sui_transaction_builder::Function::new(
-                        ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                        "currency".parse().unwrap(),
-                        "delete_mint".parse().unwrap(),
+                        ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                        "currency".parse()?,
+                        "delete_mint".parse()?,
                         vec![coin_type.clone()],
                     ),
                     vec![expired.borrow_mut().into()],
@@ -1098,9 +1098,9 @@ impl MultisigClient {
         for _ in 0..executions_count {
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency".parse().unwrap(),
-                    "delete_mint".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency".parse()?,
+                    "delete_mint".parse()?,
                     vec![coin_type.clone()],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1124,10 +1124,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_mint_and_vest".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_mint_and_vest".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1156,9 +1156,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "execute_mint_and_vest".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "execute_mint_and_vest".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -1174,9 +1174,9 @@ impl MultisigClient {
 
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency".parse().unwrap(),
-                    "delete_mint".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency".parse()?,
+                    "delete_mint".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1200,9 +1200,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency".parse().unwrap(),
-                "delete_mint".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency".parse()?,
+                "delete_mint".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -1225,10 +1225,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_withdraw_and_burn".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_withdraw_and_burn".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1267,9 +1267,9 @@ impl MultisigClient {
         let receive_coin = self.receive_argument(builder, coin_id).await?;
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "execute_withdraw_and_burn".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "execute_withdraw_and_burn".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![
@@ -1290,9 +1290,9 @@ impl MultisigClient {
             ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "currency".parse().unwrap(),
-                    "delete_burn".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "currency".parse()?,
+                    "delete_burn".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1316,9 +1316,9 @@ impl MultisigClient {
         ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency".parse().unwrap(),
-                "delete_burn".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency".parse()?,
+                "delete_burn".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -1340,10 +1340,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "request_withdraw_and_transfer_to_vault".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "request_withdraw_and_transfer_to_vault".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1382,9 +1382,9 @@ impl MultisigClient {
         let receive_coin = self.receive_argument(builder, coin_id).await?;
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "currency_intents".parse().unwrap(),
-                "execute_withdraw_and_transfer_to_vault".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "currency_intents".parse()?,
+                "execute_withdraw_and_transfer_to_vault".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![
@@ -1405,9 +1405,9 @@ impl MultisigClient {
             ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "vault".parse().unwrap(),
-                    "delete_deposit".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "vault".parse()?,
+                    "delete_deposit".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1431,9 +1431,9 @@ impl MultisigClient {
         ap::owned::delete_withdraw(builder, expired.borrow_mut(), multisig.borrow_mut());
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault".parse().unwrap(),
-                "delete_deposit".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault".parse()?,
+                "delete_deposit".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -1493,10 +1493,10 @@ impl MultisigClient {
 
             builder.move_call(
                 Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "owned_intents".parse().unwrap(),
-                    "execute_withdraw_and_transfer".parse().unwrap(),
-                    vec![obj_type.parse().unwrap()],
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "owned_intents".parse()?,
+                    "execute_withdraw_and_transfer".parse()?,
+                    vec![obj_type.parse()?],
                 ),
                 vec![
                     executable.borrow_mut().into(),
@@ -1585,9 +1585,9 @@ impl MultisigClient {
         let receive_id = self.receive_argument(builder, coin_id).await?;
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "owned_intents".parse().unwrap(),
-                "execute_withdraw_and_vest".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "owned_intents".parse()?,
+                "execute_withdraw_and_vest".parse()?,
                 vec![format!("0x2::coin::Coin<{}>", coin_type)
                     .parse()
                     .unwrap()],
@@ -1806,10 +1806,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault_intents".parse().unwrap(),
-                "request_spend_and_transfer".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault_intents".parse()?,
+                "request_spend_and_transfer".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1838,9 +1838,9 @@ impl MultisigClient {
         for _ in 0..executions_count {
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "vault_intents".parse().unwrap(),
-                    "execute_spend_and_transfer".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "vault_intents".parse()?,
+                    "execute_spend_and_transfer".parse()?,
                     vec![coin_type.clone()],
                 ),
                 vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -1858,9 +1858,9 @@ impl MultisigClient {
             for _ in 0..executions_count {
                 builder.move_call(
                     sui_transaction_builder::Function::new(
-                        ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                        "vault".parse().unwrap(),
-                        "delete_spend".parse().unwrap(),
+                        ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                        "vault".parse()?,
+                        "delete_spend".parse()?,
                         vec![coin_type.clone()],
                     ),
                     vec![expired.borrow_mut().into()],
@@ -1886,9 +1886,9 @@ impl MultisigClient {
         for _ in 0..executions_count {
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "vault".parse().unwrap(),
-                    "delete_spend".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "vault".parse()?,
+                    "delete_spend".parse()?,
                     vec![coin_type.clone()],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1912,10 +1912,10 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault_intents".parse().unwrap(),
-                "request_spend_and_vest".parse().unwrap(),
-                vec![coin_type.parse().unwrap()],
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault_intents".parse()?,
+                "request_spend_and_vest".parse()?,
+                vec![coin_type.parse()?],
             ),
             vec![
                 auth.into(),
@@ -1945,9 +1945,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault_intents".parse().unwrap(),
-                "execute_spend_and_vest".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault_intents".parse()?,
+                "execute_spend_and_vest".parse()?,
                 vec![coin_type.clone()],
             ),
             vec![executable.borrow_mut().into(), multisig.borrow_mut().into()],
@@ -1963,9 +1963,9 @@ impl MultisigClient {
 
             builder.move_call(
                 sui_transaction_builder::Function::new(
-                    ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                    "vault".parse().unwrap(),
-                    "delete_spend".parse().unwrap(),
+                    ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                    "vault".parse()?,
+                    "delete_spend".parse()?,
                     vec![coin_type],
                 ),
                 vec![expired.borrow_mut().into()],
@@ -1989,9 +1989,9 @@ impl MultisigClient {
 
         builder.move_call(
             sui_transaction_builder::Function::new(
-                ACCOUNT_ACTIONS_PACKAGE.parse().unwrap(),
-                "vault".parse().unwrap(),
-                "delete_spend".parse().unwrap(),
+                ACCOUNT_ACTIONS_PACKAGE.parse()?,
+                "vault".parse()?,
+                "delete_spend".parse()?,
                 vec![coin_type],
             ),
             vec![expired.borrow_mut().into()],
@@ -2071,7 +2071,7 @@ impl MultisigClient {
 
     pub async fn clock_timestamp(&self) -> Result<u64> {
         let clock_object =
-            utils::get_object(&self.sui_client, CLOCK_OBJECT.parse().unwrap()).await?;
+            utils::get_object(&self.sui_client, CLOCK_OBJECT.parse()?).await?;
         if let ObjectData::Struct(obj) = clock_object.data() {
             let clock: sui::clock::Clock = bcs::from_bytes(obj.contents())
                 .map_err(|e| anyhow!("Failed to parse clock object: {}", e))?;
@@ -2144,7 +2144,7 @@ impl MultisigClient {
         &self,
         builder: &mut TransactionBuilder,
     ) -> Result<Arg<sui::clock::Clock>> {
-        let clock_input = self.obj(CLOCK_OBJECT.parse().unwrap()).await?;
+        let clock_input = self.obj(CLOCK_OBJECT.parse()?).await?;
         let clock = builder.input(clock_input.by_ref()).into();
         Ok(clock)
     }
@@ -2153,7 +2153,7 @@ impl MultisigClient {
         &self,
         builder: &mut TransactionBuilder,
     ) -> Result<Arg<ae::extensions::Extensions>> {
-        let extensions_input = self.obj(EXTENSIONS_OBJECT.parse().unwrap()).await?;
+        let extensions_input = self.obj(EXTENSIONS_OBJECT.parse()?).await?;
         let extensions = builder.input(extensions_input.by_ref()).into();
         Ok(extensions)
     }
@@ -2297,9 +2297,9 @@ impl fmt::Debug for MultisigClient {
 //                 let name = parts[2];
 
 //                 TypeTag::Struct(Box::new(StructTag {
-//                     address: address.parse().unwrap(),
-//                     module: module.parse().unwrap(),
-//                     name: name.parse().unwrap(),
+//                     address: address.parse()?,
+//                     module: module.parse()?,
+//                     name: name.parse()?,
 //                     type_params: vec![],
 //                 }))
 //             }
@@ -2323,7 +2323,7 @@ impl fmt::Debug for MultisigClient {
 
 //         impl MoveStruct for $move_object_name {
 //             fn struct_type() -> StructTag {
-//                 $full_path.parse().unwrap()
+//                 $full_path.parse()?
 //             }
 //         }
 
