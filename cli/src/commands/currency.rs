@@ -35,17 +35,17 @@ pub enum CurrencyCommands {
         name: String,
         #[arg(long, help = "Coin type (e.g. <addr>::<module>::<Coin>)")]
         coin_type: String,
-        #[arg(long)]
+        #[arg(long, help = "Disable minting")]
         mint: bool,
-        #[arg(long)]
+        #[arg(long, help = "Disable burning")]
         burn: bool,
-        #[arg(long)]
+        #[arg(long, help = "Disable symbol updates")]
         update_symbol: bool,
-        #[arg(long)]
+        #[arg(long, help = "Disable name updates")]
         update_name: bool,
-        #[arg(long)]
+        #[arg(long, help = "Disable description updates")]
         update_description: bool,
-        #[arg(long)]
+        #[arg(long, help = "Disable icon updates")]
         update_icon: bool,
     },
     #[command(
