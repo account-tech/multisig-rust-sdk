@@ -12,6 +12,12 @@ Install the CLI from source:
 cargo install --git https://github.com/account-tech/multisig-rust-sdk account-multisig-cli
 ```
 
+The CLI uses the same configuration file for authentication as the `sui client`. Ensure you have:
+
+1. A valid Sui configuration file (`~/.sui/sui_config/sui-client.yaml`)
+2. An active address with sufficient balance
+3. The keypair is Ed25519 (currently required)
+
 ---
 
 ## Usage
@@ -382,16 +388,6 @@ currencies deposit-treasury-cap \
 # Create mint proposal
 currencies propose-mint-and-transfer --name "Team Distribution" --coin-type "0x456::module::MyCoin" --amounts 1000 2000 3000 --recipients 0x123...abc 0x456...def 0x789...ghi
 ```
-
----
-
-## Configuration
-
-The CLI uses the same configuration file for authentication as the `sui client`. Ensure you have:
-
-1. A valid Sui configuration file (`~/.sui/sui_config/sui-client.yaml`)
-2. An active address with sufficient balance
-3. The keypair is Ed25519 (currently required)
 
 ---
 
