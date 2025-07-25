@@ -1,7 +1,7 @@
 use account_multisig_cli::commands::{
     cap::CapCommands,
     config::ConfigCommands,
-    create::{Member, Role, create_multisig},
+    create::create_multisig,
     currency::CurrencyCommands,
     deps::DepsCommands,
     owned::OwnedCommands,
@@ -10,6 +10,7 @@ use account_multisig_cli::commands::{
     user::UserCommands,
     vault::VaultCommands,
 };
+use account_multisig_cli::parsers::{Member, Role};
 use account_multisig_sdk::MultisigClient;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};

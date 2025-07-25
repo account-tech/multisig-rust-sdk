@@ -5,8 +5,9 @@ use account_multisig_sdk::{
 use anyhow::{Result, anyhow};
 use clap::Subcommand;
 use sui_crypto::ed25519::Ed25519PrivateKey;
-use sui_sdk_types::Address;
+use std::str::FromStr;
 
+use crate::parsers::{Member, Role};
 use crate::tx_utils;
 
 #[derive(Debug, Subcommand)]
@@ -15,23 +16,17 @@ pub enum ConfigCommands {
     ModifyName { name: String },
     #[command(
         name = "propose-config-multisig",
-        about = "Create a proposal with a new config"
+        about = "Create a proposal with a new config (overrides the current state with the new one)"
     )]
     ProposeConfigMultisig {
         #[arg(long, short, help = "Name of the proposal")]
         name: String,
-        #[arg(long, short, help = "Addresses of the members")]
-        addresses: Vec<Address>,
-        #[arg(long, short, help = "Weights of the members")]
-        weights: Vec<u64>,
-        #[arg(long, short, help = "Roles of the members (e.g. [package::module,package::module1,...])")]
-        roles: Vec<String>,
+        #[arg(long, value_parser = clap::builder::ValueParser::new(Member::from_str))]
+        member: Option<Vec<Member>>,
+        #[arg(long, value_parser = clap::builder::ValueParser::new(Role::from_str))]
+        role: Option<Vec<Role>>,
         #[arg(long, short, help = "Global threshold")]
-        global: u64,
-        #[arg(long, short, help = "Names of the roles")]
-        role_names: Vec<String>,
-        #[arg(long, short, help = "Thresholds of the roles")]
-        role_thresholds: Vec<u64>,
+        global_threshold: u64,
     },
 }
 
@@ -50,26 +45,54 @@ impl ConfigCommands {
             }
             ConfigCommands::ProposeConfigMultisig {
                 name,
-                addresses,
-                weights,
-                roles,
-                global,
-                role_names,
-                role_thresholds,
+                member,
+                role,
+                global_threshold,
             } => {
                 let mut builder =
                     tx_utils::init(client.sui(), pk.public_key().derive_address()).await?;
 
                 let intent_args =
-                    ParamsArgs::new(&mut builder, name.clone(), "".to_string(), vec![], 0);
+                    ParamsArgs::new(&mut builder, name.clone(), "".to_string(), vec![0], 0);
+
+                // Convert Member and Role structs to the format expected by ConfigMultisigArgs
+                let addresses = member
+                    .as_ref()
+                    .map(|m| {
+                        m.iter()
+                            .map(|member| member.address.parse().unwrap())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                let weights = member
+                    .as_ref()
+                    .map(|m| m.iter().map(|member| member.weight).collect())
+                    .unwrap_or_default();
+
+                let roles = member
+                    .as_ref()
+                    .map(|m| m.iter().map(|member| member.roles.clone()).collect())
+                    .unwrap_or_default();
+
+                let role_names = role
+                    .as_ref()
+                    .map(|r| r.iter().map(|role| role.name.clone()).collect())
+                    .unwrap_or_default();
+
+                let role_thresholds = role
+                    .as_ref()
+                    .map(|r| r.iter().map(|role| role.threshold).collect())
+                    .unwrap_or_default();
+
                 let actions_args = ConfigMultisigArgs::new(
                     &mut builder,
-                    addresses.clone(),
-                    weights.clone(),
-                    roles.iter().map(|r| r.split(",").map(|s| s.to_string()).collect()).collect(),
-                    global.clone(),
-                    role_names.clone(),
-                    role_thresholds.clone(),
+                    addresses,
+                    weights,
+                    roles,
+                    global_threshold.clone(),
+                    role_names,
+                    role_thresholds,
                 );
 
                 client
